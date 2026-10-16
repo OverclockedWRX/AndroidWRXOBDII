@@ -37,7 +37,7 @@ data class HudPreferences(
     val pressureUnit: PressureUnit = PressureUnit.PSI,
     val redlineRpm: Int = WrxProfile.REDLINE_RPM,
     val shiftLightStarts: List<Int> = listOf(
-        5200, 5400, 5600, 5800, 6000, 6200, 6400, 6500, 6600, 6700
+        3300, 3600, 3900, 4200, 4500, 4800, 5100, 5400, 5700, 6100
     ),
     val useSptCvt: Boolean = false,
     val tireWidthMm: Int = WrxProfile.DEFAULT_TIRE_WIDTH_MM,

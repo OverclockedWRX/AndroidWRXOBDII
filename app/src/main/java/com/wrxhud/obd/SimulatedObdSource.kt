@@ -23,7 +23,8 @@ class SimulatedObdSource(
             val rpm = (2200 + 2800 * (0.5 + 0.5 * sin(t * 1.6))).toFloat()
             val speedMph = (25 + 45 * (0.5 + 0.5 * sin(t * 0.7))).toFloat()
             val speedMps = speedMph / 2.2369363f
-            val boost = (4f + 10f * ((rpm - 2000f) / 4000f).coerceIn(0f, 1f))
+            // Swings through vacuum (negative) into boost (positive) with RPM.
+            val boost = (-8f + 22f * ((rpm - 1800f) / 4200f).coerceIn(0f, 1f))
             val coolant = 88f + 8f * sin(t * 0.05).toFloat()
             val oil = 95f + 10f * sin(t * 0.04).toFloat()
             val iat = 28f + 6f * sin(t * 0.1).toFloat()

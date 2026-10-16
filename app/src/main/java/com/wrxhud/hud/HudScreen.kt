@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
@@ -124,10 +123,9 @@ fun HudScreen(
                     )
                 }
                 if (GaugeId.BOOST in preferences.enabledGauges) {
-                    GaugeTile(
-                        label = "BOOST",
-                        valueText = UnitConverters.formatPressure(snapshot.boostPsi, preferences.pressureUnit),
-                        unit = preferences.pressureUnit.name,
+                    BoostVacTile(
+                        psi = snapshot.boostPsi,
+                        unit = preferences.pressureUnit,
                         severity = AlarmEvaluator.severityForBoost(snapshot.boostPsi, thresholds),
                         modifier = Modifier.weight(1f)
                     )
@@ -162,7 +160,8 @@ fun HudScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
         ) {
             Text(
                 text = buildString {
@@ -172,7 +171,8 @@ fun HudScreen(
                 },
                 color = HudColors.TextDim,
                 fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.weight(1f)
             )
             Text(
                 text = "WRX VB FA24  2022+",
@@ -180,7 +180,6 @@ fun HudScreen(
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
             )
-            Spacer(Modifier.width(1.dp))
         }
     }
 }

@@ -16,12 +16,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.vehicle.AlarmEvaluator
+import com.wrxhud.vehicle.PressureUnit
+import com.wrxhud.vehicle.UnitConverters
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -77,6 +80,79 @@ fun GaugeTile(
         )
         Text(
             text = unit,
+            color = HudColors.TextDim,
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+/**
+ * Manifold relative pressure: positive = boost (blue-shaded panel), negative = vacuum (plain).
+ */
+@Composable
+fun BoostVacTile(
+    psi: Float?,
+    unit: PressureUnit,
+    severity: AlarmEvaluator.Severity,
+    modifier: Modifier = Modifier
+) {
+    val inBoost = psi != null && psi > 0f
+    val label = when {
+        psi == null -> "BOOST"
+        inBoost -> "BOOST"
+        else -> "VACUUM"
+    }
+    val flashOn by produceState(initialValue = true, severity) {
+        if (severity == AlarmEvaluator.Severity.CRITICAL) {
+            while (isActive) {
+                value = !value
+                delay(120)
+            }
+        } else {
+            value = true
+        }
+    }
+    val valueColor = when {
+        severity == AlarmEvaluator.Severity.CRITICAL && !flashOn -> HudColors.TextDim
+        severity == AlarmEvaluator.Severity.CRITICAL -> HudColors.Red
+        severity == AlarmEvaluator.Severity.WARN -> HudColors.Amber
+        else -> HudColors.TextPrimary
+    }
+    val shape = RoundedCornerShape(8.dp)
+    val panelColor = if (inBoost) {
+        lerp(HudColors.Panel, HudColors.BoostBlue.copy(alpha = 0.45f), 0.55f)
+    } else {
+        HudColors.Panel
+    }
+    val borderColor = if (inBoost) HudColors.BoostBlue else HudColors.Border
+
+    Column(
+        modifier = modifier
+            .widthIn(min = 100.dp)
+            .clip(shape)
+            .background(panelColor, shape)
+            .border(1.dp, borderColor, shape)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = label,
+            color = if (inBoost) HudColors.BoostBlue else HudColors.TextDim,
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Medium
+        )
+        Text(
+            text = UnitConverters.formatPressure(psi, unit),
+            color = valueColor,
+            fontSize = 28.sp,
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = unit.name,
             color = HudColors.TextDim,
             fontSize = 10.sp,
             fontFamily = FontFamily.Monospace

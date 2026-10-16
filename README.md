@@ -9,7 +9,7 @@ Android 15+ race instrument / HUD for **2022–present Subaru WRX (VB / FA24)** 
 - AiM-style shift lights and bar tachometer with frame-timed RPM interpolation
 - GPS speed display (phone GPS)
 - Calculated gear (6MT or SPT/CVT ratios + tire size)
-- Toggleable gauges: coolant, oil temp, IAT, boost, battery
+- Toggleable gauges: coolant, oil temp, IAT, boost/vacuum, battery
 - Zone-colored tach bar (green → amber → red toward redline)
 - Warning lamps: CEL, low fuel, temps, overboost, battery, OBD/GPS link, knock/DAM (when Mode 22 DIDs are confirmed)
 - Simulator mode for UI development without a car

@@ -1,5 +1,6 @@
 package com.wrxhud.settings
 
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -29,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -49,13 +51,25 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onUpdate: ((HudPreferences) -> HudPreferences) -> Unit
 ) {
+    val context = LocalContext.current
+    val versionLabel = remember(context) {
+        val info = context.packageManager.getPackageInfo(
+            context.packageName,
+            PackageManager.PackageInfoFlags.of(0)
+        )
+        "v${info.versionName ?: "?"} (${info.longVersionCode})"
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(HudColors.Background)
             .padding(12.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             IconButton(onClick = onBack) {
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -68,6 +82,13 @@ fun SettingsScreen(
                 color = HudColors.TextPrimary,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.weight(1f)
+            )
+            Text(
+                text = versionLabel,
+                color = HudColors.TextDim,
+                fontSize = 12.sp,
                 fontFamily = FontFamily.Monospace
             )
         }

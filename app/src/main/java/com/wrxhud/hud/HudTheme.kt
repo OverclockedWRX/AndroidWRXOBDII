@@ -9,6 +9,7 @@ object HudColors {
     val TextPrimary = Color(0xFFF5F5F5)
     val TextDim = Color(0xFF8A8A8A)
     val Accent = Color(0xFFE10600)
+    val BoostBlue = Color(0xFF3B82F6)
     val Green = Color(0xFF22C55E)
     val Amber = Color(0xFFF59E0B)
     val Red = Color(0xFFEF4444)

@@ -70,8 +70,13 @@ class HudCarScreen(carContext: CarContext) : Screen(carContext) {
             addRow("SPEED", "$speed ${if (useMph) "MPH" else "KM/H"}")
         }
         if (GaugeId.BOOST in prefs.enabledGauges) {
+            val boostLabel = when {
+                snap.boostPsi == null -> "BOOST"
+                snap.boostPsi > 0f -> "BOOST"
+                else -> "VACUUM"
+            }
             addRow(
-                "BOOST",
+                boostLabel,
                 "${UnitConverters.formatPressure(snap.boostPsi, prefs.pressureUnit)} ${prefs.pressureUnit.name}"
             )
         }

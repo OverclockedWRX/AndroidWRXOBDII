@@ -9,7 +9,7 @@ package com.wrxhud.vehicle
 object WrxProfile {
     const val MODEL_YEARS = "2022–present"
     const val ENGINE = "FA24"
-    const val REDLINE_RPM = 6700
+    const val REDLINE_RPM = 6200
     const val DEFAULT_TIRE_WIDTH_MM = 245
     const val DEFAULT_TIRE_ASPECT = 40
     const val DEFAULT_WHEEL_DIAMETER_IN = 18
