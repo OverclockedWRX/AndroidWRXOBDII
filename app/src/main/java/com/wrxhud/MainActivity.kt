@@ -12,6 +12,7 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -20,6 +21,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.wrxhud.hud.HudColors
+import com.wrxhud.hud.HudThemeController
 import com.wrxhud.hud.HudViewModel
 import com.wrxhud.onboarding.OnboardingWizard
 import com.wrxhud.ui.AppShell
@@ -48,6 +50,10 @@ class MainActivity : ComponentActivity() {
                 if (ui.preferences.onboardingComplete) {
                     viewModel.startRuntimeIfNeeded(ui.preferences)
                 }
+            }
+
+            SideEffect {
+                HudThemeController.pinkyMode = ui.preferences.pinkyMode
             }
 
             Surface(

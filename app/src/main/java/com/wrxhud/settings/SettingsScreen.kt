@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import com.wrxhud.hud.HudColors
+import com.wrxhud.hud.HudThemeController
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -110,6 +111,61 @@ fun SettingsScreen(
                 Switch(
                     checked = preferences.useSimulator,
                     onCheckedChange = { checked -> onUpdate { it.copy(useSimulator = checked) } }
+                )
+            }
+
+            SectionTitle("Appearance")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Pinky Mode",
+                        color = if (preferences.pinkyMode) HudColors.Accent else HudColors.TextPrimary,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Soft rose / hot-pink HUD theme",
+                        color = HudColors.TextDim,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Switch(
+                    checked = preferences.pinkyMode,
+                    onCheckedChange = { checked ->
+                        HudThemeController.pinkyMode = checked
+                        onUpdate { it.copy(pinkyMode = checked) }
+                    }
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        "DANGER TO MANIFOLD",
+                        color = if (preferences.dangerToManifold) HudColors.Amber else HudColors.TextPrimary,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "If redline is hit, more than once in the current driving session, a 3 second Fast and Furious style \"Danger to manifold\" graphic will display.",
+                        color = HudColors.TextDim,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 15.sp
+                    )
+                }
+                Switch(
+                    checked = preferences.dangerToManifold,
+                    onCheckedChange = { checked -> onUpdate { it.copy(dangerToManifold = checked) } }
                 )
             }
 

@@ -23,9 +23,11 @@ class SimulatedObdSource(
         var previousRpm = 1200f
         val rng = Random(System.currentTimeMillis())
 
-        var nextPullAtMs = System.currentTimeMillis() + rng.nextLong(4_000L, 8_000L)
+        // Two quick redline pulls early so DANGER TO MANIFOLD can fire in sim (~2nd hit).
+        var nextPullAtMs = System.currentTimeMillis() + rng.nextLong(2_500L, 4_000L)
         var pullStartMs = 0L
         var pullActive = false
+        var completedPulls = 0
 
         var nextAlertAtMs = System.currentTimeMillis() + rng.nextLong(2_000L, 5_000L)
         val alertUntil = LongArray(ALERT_COUNT) { 0L }
@@ -54,7 +56,12 @@ class SimulatedObdSource(
                     }
                     else -> {
                         pullActive = false
-                        nextPullAtMs = now + rng.nextLong(5_000L, 11_000L)
+                        completedPulls++
+                        nextPullAtMs = now + if (completedPulls < 2) {
+                            rng.nextLong(2_000L, 3_500L)
+                        } else {
+                            rng.nextLong(5_000L, 11_000L)
+                        }
                         2800f
                     }
                 }

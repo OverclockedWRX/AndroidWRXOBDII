@@ -36,6 +36,8 @@ class SettingsRepository(private val context: Context) {
         val tireAspect = intPreferencesKey("tire_aspect")
         val wheelIn = intPreferencesKey("wheel_in")
         val useSim = booleanPreferencesKey("use_sim")
+        val pinkyMode = booleanPreferencesKey("pinky_mode")
+        val dangerToManifold = booleanPreferencesKey("danger_to_manifold")
         val coolantAmber = floatPreferencesKey("coolant_amber")
         val coolantRed = floatPreferencesKey("coolant_red")
         val oilAmber = floatPreferencesKey("oil_amber")
@@ -67,6 +69,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.tireAspect] = next.tireAspect
             prefs[Keys.wheelIn] = next.wheelDiameterIn
             prefs[Keys.useSim] = next.useSimulator
+            prefs[Keys.pinkyMode] = next.pinkyMode
+            prefs[Keys.dangerToManifold] = next.dangerToManifold
             prefs[Keys.coolantAmber] = next.coolantAmberC
             prefs[Keys.coolantRed] = next.coolantRedC
             prefs[Keys.oilAmber] = next.oilTempAmberC
@@ -113,6 +117,8 @@ class SettingsRepository(private val context: Context) {
             tireAspect = this[Keys.tireAspect] ?: defaults.tireAspect,
             wheelDiameterIn = this[Keys.wheelIn] ?: defaults.wheelDiameterIn,
             useSimulator = this[Keys.useSim] ?: defaults.useSimulator,
+            pinkyMode = this[Keys.pinkyMode] ?: defaults.pinkyMode,
+            dangerToManifold = this[Keys.dangerToManifold] ?: defaults.dangerToManifold,
             coolantAmberC = this[Keys.coolantAmber] ?: defaults.coolantAmberC,
             coolantRedC = this[Keys.coolantRed] ?: defaults.coolantRedC,
             oilTempAmberC = this[Keys.oilAmber] ?: defaults.oilTempAmberC,

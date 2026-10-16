@@ -60,6 +60,9 @@ data class HudPreferences(
     val tireAspect: Int = WrxProfile.DEFAULT_TIRE_ASPECT,
     val wheelDiameterIn: Int = WrxProfile.DEFAULT_WHEEL_DIAMETER_IN,
     val useSimulator: Boolean = true,
+    val pinkyMode: Boolean = false,
+    /** Fast & Furious redline Easter egg overlay after the 2nd+ redline hit this session. */
+    val dangerToManifold: Boolean = false,
     val coolantAmberC: Float = 105f,
     val coolantRedC: Float = 115f,
     val oilTempAmberC: Float = 120f,

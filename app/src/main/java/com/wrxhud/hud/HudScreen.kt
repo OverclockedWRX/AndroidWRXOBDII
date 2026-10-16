@@ -39,148 +39,155 @@ fun HudScreen(
     val useF = preferences.tempUnit == TempUnit.F
     val useMph = preferences.speedUnit == SpeedUnit.MPH
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(HudColors.Background)
-            .padding(8.dp)
+    DangerToManifoldHost(
+        enabled = preferences.dangerToManifold,
+        rpm = snapshot.rpm,
+        redlineRpm = preferences.redlineRpm,
+        modifier = Modifier.fillMaxSize()
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(HudColors.Background)
+                .padding(8.dp)
         ) {
-            ShiftLights(
-                rpm = snapshot.rpm,
-                thresholds = preferences.shiftLightStarts,
-                redline = preferences.redlineRpm,
-                pattern = preferences.shiftLightPattern,
-                modifier = Modifier.weight(1f)
-            )
-            IconButton(onClick = onOpenSettings) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "Settings",
-                    tint = HudColors.TextDim
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                ShiftLights(
+                    rpm = snapshot.rpm,
+                    thresholds = preferences.shiftLightStarts,
+                    redline = preferences.redlineRpm,
+                    pattern = preferences.shiftLightPattern,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = "Settings",
+                        tint = HudColors.TextDim
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(4.dp))
+
+            if (GaugeId.RPM in preferences.enabledGauges || GaugeId.GEAR in preferences.enabledGauges) {
+                Tachometer(
+                    rpm = if (GaugeId.RPM in preferences.enabledGauges) snapshot.rpm else null,
+                    previousRpm = snapshot.previousRpm,
+                    sampleAgeMs = snapshot.rpmSampleAgeMs,
+                    redline = preferences.redlineRpm,
+                    gear = if (GaugeId.GEAR in preferences.enabledGauges) snapshot.gear else null
                 )
             }
-        }
 
-        Spacer(Modifier.height(4.dp))
-
-        if (GaugeId.RPM in preferences.enabledGauges || GaugeId.GEAR in preferences.enabledGauges) {
-            Tachometer(
-                rpm = if (GaugeId.RPM in preferences.enabledGauges) snapshot.rpm else null,
-                previousRpm = snapshot.previousRpm,
-                sampleAgeMs = snapshot.rpmSampleAgeMs,
-                redline = preferences.redlineRpm,
-                gear = if (GaugeId.GEAR in preferences.enabledGauges) snapshot.gear else null
-            )
-        }
-
-        Spacer(Modifier.height(8.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            if (GaugeId.SPEED in preferences.enabledGauges) {
-                SpeedTile(
-                    label = "SPEED",
-                    value = UnitConverters.formatSpeed(snapshot.gpsSpeedMps, useMph),
-                    unit = if (useMph) "MPH GPS" else "KM/H GPS"
-                )
-            }
+            Spacer(Modifier.height(8.dp))
 
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (GaugeId.COOLANT in preferences.enabledGauges) {
-                    GaugeTile(
-                        label = "COOLANT",
-                        valueText = UnitConverters.formatTemp(snapshot.coolantC, useF),
-                        unit = if (useF) "°F" else "°C",
-                        severity = AlarmEvaluator.severityForCoolant(snapshot.coolantC, thresholds),
-                        modifier = Modifier.weight(1f)
+                if (GaugeId.SPEED in preferences.enabledGauges) {
+                    SpeedTile(
+                        label = "SPEED",
+                        value = UnitConverters.formatSpeed(snapshot.gpsSpeedMps, useMph),
+                        unit = if (useMph) "MPH GPS" else "KM/H GPS"
                     )
                 }
-                if (GaugeId.OIL_TEMP in preferences.enabledGauges) {
-                    GaugeTile(
-                        label = "OIL TEMP",
-                        valueText = UnitConverters.formatTemp(snapshot.oilTempC, useF),
-                        unit = if (useF) "°F" else "°C",
-                        severity = AlarmEvaluator.severityForOilTemp(snapshot.oilTempC, thresholds),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                if (GaugeId.INTAKE_AIR_TEMP in preferences.enabledGauges) {
-                    GaugeTile(
-                        label = "IAT",
-                        valueText = UnitConverters.formatTemp(snapshot.intakeAirTempC, useF),
-                        unit = if (useF) "°F" else "°C",
-                        severity = AlarmEvaluator.severityForIat(snapshot.intakeAirTempC, thresholds),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                if (GaugeId.BOOST in preferences.enabledGauges) {
-                    BoostVacTile(
-                        psi = snapshot.boostPsi,
-                        unit = preferences.pressureUnit,
-                        severity = AlarmEvaluator.severityForBoost(snapshot.boostPsi, thresholds),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                if (GaugeId.BATTERY in preferences.enabledGauges) {
-                    GaugeTile(
-                        label = "BATT",
-                        valueText = UnitConverters.formatVoltage(snapshot.batteryVolts),
-                        unit = "V",
-                        severity = when {
-                            snapshot.batteryVolts == null -> AlarmEvaluator.Severity.NONE
-                            snapshot.batteryVolts < thresholds.lowBatteryVolts -> AlarmEvaluator.Severity.WARN
-                            else -> AlarmEvaluator.Severity.NORMAL
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
+
+                Row(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (GaugeId.COOLANT in preferences.enabledGauges) {
+                        GaugeTile(
+                            label = "COOLANT",
+                            valueText = UnitConverters.formatTemp(snapshot.coolantC, useF),
+                            unit = if (useF) "°F" else "°C",
+                            severity = AlarmEvaluator.severityForCoolant(snapshot.coolantC, thresholds),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (GaugeId.OIL_TEMP in preferences.enabledGauges) {
+                        GaugeTile(
+                            label = "OIL TEMP",
+                            valueText = UnitConverters.formatTemp(snapshot.oilTempC, useF),
+                            unit = if (useF) "°F" else "°C",
+                            severity = AlarmEvaluator.severityForOilTemp(snapshot.oilTempC, thresholds),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (GaugeId.INTAKE_AIR_TEMP in preferences.enabledGauges) {
+                        GaugeTile(
+                            label = "IAT",
+                            valueText = UnitConverters.formatTemp(snapshot.intakeAirTempC, useF),
+                            unit = if (useF) "°F" else "°C",
+                            severity = AlarmEvaluator.severityForIat(snapshot.intakeAirTempC, thresholds),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (GaugeId.BOOST in preferences.enabledGauges) {
+                        BoostVacTile(
+                            psi = snapshot.boostPsi,
+                            unit = preferences.pressureUnit,
+                            severity = AlarmEvaluator.severityForBoost(snapshot.boostPsi, thresholds),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (GaugeId.BATTERY in preferences.enabledGauges) {
+                        GaugeTile(
+                            label = "BATT",
+                            valueText = UnitConverters.formatVoltage(snapshot.batteryVolts),
+                            unit = "V",
+                            severity = when {
+                                snapshot.batteryVolts == null -> AlarmEvaluator.Severity.NONE
+                                snapshot.batteryVolts < thresholds.lowBatteryVolts -> AlarmEvaluator.Severity.WARN
+                                else -> AlarmEvaluator.Severity.NORMAL
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
-        }
 
-        Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(10.dp))
 
-        WarningLamps(
-            alarms = snapshot.alarms,
-            enabled = preferences.enabledLamps,
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(Modifier.weight(1f))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            Text(
-                text = buildString {
-                    append(connectionStatus)
-                    if (snapshot.usingSimulator) append("  [SIM]")
-                    snapshot.oilTempSource?.let { append("  OIL:$it") }
-                },
-                color = HudColors.TextDim,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.weight(1f)
+            WarningLamps(
+                alarms = snapshot.alarms,
+                enabled = preferences.enabledLamps,
+                modifier = Modifier.fillMaxWidth()
             )
-            Text(
-                text = "WRX VB FA24  2022+",
-                color = HudColors.TextDim,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace
-            )
+
+            Spacer(Modifier.weight(1f))
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    text = buildString {
+                        append(connectionStatus)
+                        if (snapshot.usingSimulator) append("  [SIM]")
+                        snapshot.oilTempSource?.let { append("  OIL:$it") }
+                    },
+                    color = HudColors.TextDim,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    text = "WRX VB FA24  2022+",
+                    color = HudColors.TextDim,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace
+                )
+            }
         }
     }
 }
