@@ -94,6 +94,24 @@ object StnParser {
         return (data[0].toInt() and 0x80) != 0
     }
 
+    /**
+     * Mode 01 PID 0x34 / 0x44: equivalence ratio λ = (A×256+B) / 32768.
+     * Gasoline AFR = λ × [stoichAfr] (typically 14.7).
+     */
+    fun decodeEquivalenceRatio(data: ByteArray): Float? {
+        if (data.size < 2) return null
+        val a = data[0].toInt() and 0xFF
+        val b = data[1].toInt() and 0xFF
+        val lambda = ((a * 256) + b) / 32768f
+        if (lambda <= 0f || lambda > 2.5f) return null
+        return lambda
+    }
+
+    fun decodeAfr(data: ByteArray, stoichAfr: Float = 14.7f): Float? {
+        val lambda = decodeEquivalenceRatio(data) ?: return null
+        return lambda * stoichAfr
+    }
+
     fun decodeSupportedPidBitmask(data: ByteArray): Set<Int> {
         if (data.size < 4) return emptySet()
         val supported = mutableSetOf<Int>()

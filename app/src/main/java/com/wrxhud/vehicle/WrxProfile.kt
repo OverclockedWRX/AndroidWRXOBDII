@@ -99,7 +99,14 @@ object WrxProfile {
         const val CONTROL_MODULE_VOLTAGE = 0x42
         /** SAE engine oil temperature (°C = A - 40). */
         const val OIL_TEMP = 0x5C
+        /** Wideband O2 sensor 1 equivalence ratio (λ) + voltage. */
+        const val O2_EQ_RATIO = 0x34
+        /** Commanded equivalence ratio (λ). */
+        const val COMMANDED_EQ_RATIO = 0x44
     }
+
+    /** Gasoline stoichiometric AFR used to convert λ → AFR. */
+    const val STOICH_AFR = 14.7f
 
     data class AlarmThresholds(
         val coolantAmberC: Float = 105f,
@@ -111,7 +118,16 @@ object WrxProfile {
         val boostAmberPsi: Float = 18f,
         val boostRedPsi: Float = 22f,
         val lowFuelPercent: Float = 15f,
-        val lowBatteryVolts: Float = 12.0f
+        val lowBatteryVolts: Float = 12.0f,
+        /** Low oil pressure warnings (psi). */
+        val oilPressureAmberPsi: Float = 15f,
+        val oilPressureRedPsi: Float = 10f,
+        /** Lean warning (gasoline AFR). */
+        val afrLeanAmber: Float = 15.2f,
+        val afrLeanRed: Float = 16.0f,
+        /** Rich warning (gasoline AFR). */
+        val afrRichAmber: Float = 11.5f,
+        val afrRichRed: Float = 10.5f
     )
 
     fun tireCircumferenceMeters(

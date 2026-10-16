@@ -1,5 +1,6 @@
 package com.wrxhud.obd
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,12 +9,14 @@ import android.app.Service
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 import com.wrxhud.MainActivity
 import com.wrxhud.R
 import com.wrxhud.settings.SettingsRepository
@@ -29,6 +32,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.concurrent.Executors
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlin.coroutines.suspendCoroutine
 
 class ObdService : Service() {
     companion object {
@@ -46,6 +54,9 @@ class ObdService : Service() {
 
     private val binder = LocalBinder()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scanExecutor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "obd-scan").apply { isDaemon = true }
+    }
 
     private lateinit var settingsRepository: SettingsRepository
     private var connection: ObdConnection? = null
@@ -58,6 +69,10 @@ class ObdService : Service() {
 
     private val _status = MutableStateFlow("Idle")
     val status: StateFlow<String> = _status.asStateFlow()
+
+    private val _scanBusy = MutableStateFlow(false)
+    val scanBusy: StateFlow<Boolean> = _scanBusy.asStateFlow()
+    @Volatile private var scanning = false
 
     override fun onCreate() {
         super.onCreate()
@@ -89,6 +104,7 @@ class ObdService : Service() {
     override fun onDestroy() {
         stopSession(publishIdle = false)
         scope.cancel()
+        scanExecutor.shutdownNow()
         super.onDestroy()
     }
 
@@ -142,6 +158,15 @@ class ObdService : Service() {
             }
             publishPhoneOnlyIdle()
             try {
+                if (ContextCompat.checkSelfPermission(
+                        this@ObdService,
+                        Manifest.permission.BLUETOOTH_CONNECT
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    _status.value = "Bluetooth permission required"
+                    publishPhoneOnlyIdle()
+                    return@launch
+                }
                 _status.value = "Connecting…"
                 val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
                 val adapter = bluetoothManager.adapter
@@ -157,12 +182,17 @@ class ObdService : Service() {
                 }
                 val conn = ObdConnection(adapter)
                 connection = conn
-                val device = conn.findMxPlus()
-                    ?: run {
-                        _status.value = "No OBDLink MX+ — GPS only"
-                        publishPhoneOnlyIdle()
-                        return@launch
-                    }
+                val device = try {
+                    conn.findMxPlus()
+                } catch (se: SecurityException) {
+                    _status.value = "Bluetooth permission required"
+                    publishPhoneOnlyIdle()
+                    return@launch
+                } ?: run {
+                    _status.value = "No OBDLink MX+ — GPS only"
+                    publishPhoneOnlyIdle()
+                    return@launch
+                }
                 conn.connect(device)
                 _status.value = "Connected: ${device.name}"
 
@@ -188,7 +218,8 @@ class ObdService : Service() {
                         val s = _snapshot.value
                         s.gpsSpeedMps to s.gpsHasFix
                     },
-                    thresholdsProvider = { latestPrefs.toAlarmThresholds() }
+                    thresholdsProvider = { latestPrefs.toAlarmThresholds() },
+                    assignmentsProvider = { latestPrefs.pidAssignments }
                 )
                 poller = pollerInstance
                 launch {
@@ -204,11 +235,60 @@ class ObdService : Service() {
                 pollerInstance.start()
             } catch (t: Throwable) {
                 Log.e(TAG, "Live OBD failed", t)
-                _status.value = "Error: ${t.message}"
+                _status.value = when (t) {
+                    is SecurityException -> "Bluetooth permission required"
+                    else -> "Error: ${t.message}"
+                }
                 publishPhoneOnlyIdle()
             }
         }
     }
+
+    /**
+     * Pause the live poller, scan supported PIDs / Mode 22 probes, then resume.
+     * Returns empty list if not connected to a live adapter.
+     */
+    suspend fun scanPids(): List<PidScanRow> {
+        val conn = connection
+        val p = poller
+        if (conn == null || !conn.isOpen || p == null) {
+            return emptyList()
+        }
+        if (scanning) return emptyList()
+        scanning = true
+        _scanBusy.value = true
+        val previousStatus = _status.value
+        _status.value = "Scanning PIDs…"
+        return try {
+            val assignments = settingsRepository.preferencesFlow.first().pidAssignments
+            withContext(Dispatchers.IO) {
+                suspendCoroutine { cont ->
+                    scanExecutor.execute {
+                        try {
+                            p.pause()
+                            // Let in-flight poll command finish.
+                            Thread.sleep(80)
+                            val rows = PidScanner(conn, assignments).scan()
+                            cont.resume(rows)
+                        } catch (t: Throwable) {
+                            cont.resumeWithException(t)
+                        } finally {
+                            p.resume()
+                        }
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            Log.e(TAG, "PID scan failed", t)
+            emptyList()
+        } finally {
+            scanning = false
+            _scanBusy.value = false
+            _status.value = previousStatus
+        }
+    }
+
+    fun isLiveConnected(): Boolean = connection?.isOpen == true && poller != null
 
     private fun stopSession(publishIdle: Boolean) {
         simJob?.cancel()

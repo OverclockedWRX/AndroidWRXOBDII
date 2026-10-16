@@ -7,12 +7,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.wrxhud.hud.HudScreen
 import com.wrxhud.hud.HudUiState
+import com.wrxhud.obd.PidScanRow
 import com.wrxhud.settings.SettingsScreen
 
 @Composable
 fun AppShell(
     ui: HudUiState,
-    onUpdatePreferences: ((com.wrxhud.settings.HudPreferences) -> com.wrxhud.settings.HudPreferences) -> Unit
+    onUpdatePreferences: ((com.wrxhud.settings.HudPreferences) -> com.wrxhud.settings.HudPreferences) -> Unit,
+    onScanPids: suspend () -> List<PidScanRow> = { emptyList() },
+    connectionStatus: String = ui.connectionStatus
 ) {
     var showSettings by remember { mutableStateOf(false) }
 
@@ -20,7 +23,9 @@ fun AppShell(
         SettingsScreen(
             preferences = ui.preferences,
             onBack = { showSettings = false },
-            onUpdate = onUpdatePreferences
+            onUpdate = onUpdatePreferences,
+            onScanPids = onScanPids,
+            connectionStatus = connectionStatus
         )
         return
     }
@@ -29,6 +34,7 @@ fun AppShell(
         snapshot = ui.snapshot,
         preferences = ui.preferences,
         connectionStatus = ui.connectionStatus,
+        motion = ui.motion,
         onOpenSettings = { showSettings = true }
     )
 }

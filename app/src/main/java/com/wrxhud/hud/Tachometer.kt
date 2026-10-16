@@ -1,6 +1,7 @@
 package com.wrxhud.hud
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,9 +29,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wrxhud.sensors.MotionReading
 import com.wrxhud.vehicle.UnitConverters
 import kotlin.math.min
 
@@ -46,6 +47,7 @@ fun Tachometer(
     sampleAgeMs: Long,
     redline: Int,
     gear: Int?,
+    motion: MotionReading = MotionReading(),
     threeDimensional: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -97,25 +99,32 @@ fun Tachometer(
                 .weight(1f)
                 .fillMaxHeight()
         ) {
-            Column(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Text(
-                    text = UnitConverters.formatRpm(displayRpm),
-                    color = rpmColor,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.Center
-                )
-                Text(
-                    text = "RPM",
-                    color = HudColors.TextDim,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    textAlign = TextAlign.Center
-                )
+                Column {
+                    Text(
+                        text = UnitConverters.formatRpm(displayRpm),
+                        color = rpmColor,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "RPM",
+                        color = HudColors.TextDim,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                if (motion.available) {
+                    MotionTelemetryStrip(
+                        motion = motion,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
             }
 
             Spacer(Modifier.height(4.dp))

@@ -1,6 +1,7 @@
 package com.wrxhud.hud
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +16,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
@@ -102,13 +103,21 @@ fun DangerToManifoldHost(
     Box(modifier = modifier.fillMaxSize()) {
         content()
         if (enabled && showOverlay) {
-            DangerToManifoldGraphic(
+            // Full-screen black behind the strobe so "off" is black, not the HUD.
+            Box(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .alpha(if (flashOn) 1f else 0f)
-            )
+                    .fillMaxSize()
+                    .background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                if (flashOn) {
+                    DangerToManifoldGraphic(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp)
+                    )
+                }
+            }
         }
     }
 }

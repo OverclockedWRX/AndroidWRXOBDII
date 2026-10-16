@@ -11,6 +11,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.wrxhud.gps.GpsSourceMode
+import com.wrxhud.obd.PidAssignment
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -52,6 +53,9 @@ class SettingsRepository(private val context: Context) {
         val boostRed = floatPreferencesKey("boost_red")
         val lowFuel = floatPreferencesKey("low_fuel")
         val lowBatt = floatPreferencesKey("low_batt")
+        val oilPressureAmber = floatPreferencesKey("oil_pressure_amber")
+        val oilPressureRed = floatPreferencesKey("oil_pressure_red")
+        val pidAssignments = stringPreferencesKey("pid_assignments")
     }
 
     val preferencesFlow: Flow<HudPreferences> = context.dataStore.data.map { it.toHudPreferences() }
@@ -88,6 +92,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.boostRed] = next.boostRedPsi
             prefs[Keys.lowFuel] = next.lowFuelPercent
             prefs[Keys.lowBatt] = next.lowBatteryVolts
+            prefs[Keys.oilPressureAmber] = next.oilPressureAmberPsi
+            prefs[Keys.oilPressureRed] = next.oilPressureRedPsi
+            prefs[Keys.pidAssignments] = next.pidAssignments.joinToString(";") { it.encode() }
         }
     }
 
@@ -140,7 +147,14 @@ class SettingsRepository(private val context: Context) {
             boostAmberPsi = this[Keys.boostAmber] ?: defaults.boostAmberPsi,
             boostRedPsi = this[Keys.boostRed] ?: defaults.boostRedPsi,
             lowFuelPercent = this[Keys.lowFuel] ?: defaults.lowFuelPercent,
-            lowBatteryVolts = this[Keys.lowBatt] ?: defaults.lowBatteryVolts
+            lowBatteryVolts = this[Keys.lowBatt] ?: defaults.lowBatteryVolts,
+            oilPressureAmberPsi = this[Keys.oilPressureAmber] ?: defaults.oilPressureAmberPsi,
+            oilPressureRedPsi = this[Keys.oilPressureRed] ?: defaults.oilPressureRedPsi,
+            pidAssignments = this[Keys.pidAssignments]
+                ?.split(";")
+                ?.mapNotNull { PidAssignment.decode(it.trim()) }
+                ?.takeIf { it.isNotEmpty() }
+                ?: defaults.pidAssignments
         )
     }
 }

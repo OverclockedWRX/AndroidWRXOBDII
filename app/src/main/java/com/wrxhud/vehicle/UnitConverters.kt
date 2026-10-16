@@ -44,6 +44,11 @@ object UnitConverters {
         return "%.1f".format(volts)
     }
 
+    fun formatAfr(afr: Float?): String {
+        if (afr == null) return "—"
+        return "%.1f".format(afr)
+    }
+
     fun formatRpm(rpm: Float?): String {
         if (rpm == null) return "—"
         return "%.0f".format(rpm)

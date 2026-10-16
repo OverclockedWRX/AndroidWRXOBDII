@@ -14,6 +14,9 @@ object AlarmEvaluator {
             highIat = snapshot.intakeAirTempC?.let { it >= thresholds.iatAmberC } == true,
             overboost = snapshot.boostPsi?.let { it >= thresholds.boostAmberPsi } == true,
             lowBattery = snapshot.batteryVolts?.let { it > 0f && it < thresholds.lowBatteryVolts } == true,
+            lowOilPressure = snapshot.oilPressurePsi?.let {
+                it > 0f && it <= thresholds.oilPressureAmberPsi
+            } == true,
             linkLost = expectObd && !snapshot.obdConnected && !snapshot.usingSimulator,
             gpsLost = !snapshot.gpsHasFix,
             knock = snapshot.knockActive == true,
@@ -53,6 +56,24 @@ object AlarmEvaluator {
         return when {
             psi >= thresholds.boostRedPsi -> Severity.CRITICAL
             psi >= thresholds.boostAmberPsi -> Severity.WARN
+            else -> Severity.NORMAL
+        }
+    }
+
+    fun severityForAfr(afr: Float?, thresholds: WrxProfile.AlarmThresholds): Severity {
+        if (afr == null) return Severity.NONE
+        return when {
+            afr >= thresholds.afrLeanRed || afr <= thresholds.afrRichRed -> Severity.CRITICAL
+            afr >= thresholds.afrLeanAmber || afr <= thresholds.afrRichAmber -> Severity.WARN
+            else -> Severity.NORMAL
+        }
+    }
+
+    fun severityForOilPressure(psi: Float?, thresholds: WrxProfile.AlarmThresholds): Severity {
+        if (psi == null) return Severity.NONE
+        return when {
+            psi <= thresholds.oilPressureRedPsi -> Severity.CRITICAL
+            psi <= thresholds.oilPressureAmberPsi -> Severity.WARN
             else -> Severity.NORMAL
         }
     }

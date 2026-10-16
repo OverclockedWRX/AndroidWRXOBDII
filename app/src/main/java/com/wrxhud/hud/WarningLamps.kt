@@ -31,6 +31,7 @@ fun WarningLamps(
         if (LampId.HIGH_IAT in enabled) add("IAT" to alarms.highIat)
         if (LampId.OVERBOOST in enabled) add("BST" to alarms.overboost)
         if (LampId.LOW_BATTERY in enabled) add("BATT" to alarms.lowBattery)
+        if (LampId.LOW_OIL_PRESSURE in enabled) add("OIL P" to alarms.lowOilPressure)
         if (LampId.LINK_LOST in enabled) add("OBD" to alarms.linkLost)
         if (LampId.GPS_LOST in enabled) add("GPS" to alarms.gpsLost)
         if (LampId.KNOCK in enabled) add("KNK" to alarms.knock)

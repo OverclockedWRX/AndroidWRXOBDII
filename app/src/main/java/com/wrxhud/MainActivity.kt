@@ -32,9 +32,7 @@ class MainActivity : ComponentActivity() {
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) {
-        // After grants, start runtime using current preferences.
-        val prefs = viewModel.uiState.value.preferences
-        viewModel.startRuntimeIfNeeded(prefs.copy(onboardingComplete = true))
+        completeOnboardingAndStart()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -65,15 +63,14 @@ class MainActivity : ComponentActivity() {
                         preferences = ui.preferences,
                         onUpdate = viewModel::updatePreferences,
                         onRequestPermissions = { requestNeededPermissions() },
-                        onFinished = {
-                            // Runtime starts via LaunchedEffect when onboardingComplete flips,
-                            // and again after the permission dialog returns.
-                        }
+                        onFinished = { }
                     )
                 } else {
                     AppShell(
                         ui = ui,
-                        onUpdatePreferences = viewModel::updatePreferences
+                        onUpdatePreferences = viewModel::updatePreferences,
+                        onScanPids = { viewModel.scanPids() },
+                        connectionStatus = ui.connectionStatus
                     )
                 }
             }
@@ -117,9 +114,13 @@ class MainActivity : ComponentActivity() {
         if (needed.isNotEmpty()) {
             permissionLauncher.launch(needed.toTypedArray())
         } else {
-            viewModel.startRuntimeIfNeeded(
-                viewModel.uiState.value.preferences.copy(onboardingComplete = true)
-            )
+            completeOnboardingAndStart()
         }
+    }
+
+    private fun completeOnboardingAndStart() {
+        viewModel.updatePreferences { it.copy(onboardingComplete = true) }
+        val prefs = viewModel.uiState.value.preferences.copy(onboardingComplete = true)
+        viewModel.startRuntimeIfNeeded(prefs)
     }
 }

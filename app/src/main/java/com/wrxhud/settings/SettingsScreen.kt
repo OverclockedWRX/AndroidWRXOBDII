@@ -51,7 +51,9 @@ import com.wrxhud.vehicle.TempUnit
 fun SettingsScreen(
     preferences: HudPreferences,
     onBack: () -> Unit,
-    onUpdate: ((HudPreferences) -> HudPreferences) -> Unit
+    onUpdate: ((HudPreferences) -> HudPreferences) -> Unit,
+    onScanPids: suspend () -> List<com.wrxhud.obd.PidScanRow> = { emptyList() },
+    connectionStatus: String = ""
 ) {
     val context = LocalContext.current
     val versionLabel = remember(context) {
@@ -204,13 +206,13 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                     Text(
-                        "3D RPM gauge",
+                        "3D gauges",
                         color = if (preferences.rpmGauge3d) HudColors.Accent else HudColors.TextPrimary,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        "Extruded bar tach with depth, bevel, and specular edge",
+                        "Extruded RPM tach and shift lights with depth, bevel, and specular edge",
                         color = HudColors.TextDim,
                         fontSize = 11.sp,
                         fontFamily = FontFamily.Monospace
@@ -228,6 +230,13 @@ fun SettingsScreen(
             ) {
                 Text("Run setup wizard again", color = HudColors.TextPrimary, fontFamily = FontFamily.Monospace)
             }
+
+            PidScanSection(
+                preferences = preferences,
+                connectionStatus = connectionStatus,
+                onUpdate = onUpdate,
+                onScanPids = onScanPids
+            )
 
             SectionTitle("Gauges")
             GaugeId.entries.forEach { gauge ->
@@ -357,6 +366,12 @@ fun SettingsScreen(
             FloatField("Boost red psi", preferences.boostRedPsi) { v -> onUpdate { it.copy(boostRedPsi = v) } }
             FloatField("Low fuel %", preferences.lowFuelPercent) { v -> onUpdate { it.copy(lowFuelPercent = v) } }
             FloatField("Low battery V", preferences.lowBatteryVolts) { v -> onUpdate { it.copy(lowBatteryVolts = v) } }
+            FloatField("Oil pressure amber psi", preferences.oilPressureAmberPsi) { v ->
+                onUpdate { it.copy(oilPressureAmberPsi = v) }
+            }
+            FloatField("Oil pressure red psi", preferences.oilPressureRedPsi) { v ->
+                onUpdate { it.copy(oilPressureRedPsi = v) }
+            }
 
             Spacer(Modifier.height(24.dp))
         }

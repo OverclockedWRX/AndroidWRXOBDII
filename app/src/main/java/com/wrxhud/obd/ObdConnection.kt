@@ -32,7 +32,7 @@ class ObdConnection(
 
     @SuppressLint("MissingPermission")
     fun findMxPlus(): BluetoothDevice? {
-        return adapter.bondedDevices?.firstOrNull { device ->
+        return listBonded().firstOrNull { device ->
             val name = device.name.orEmpty()
             name.contains("OBDLink", ignoreCase = true) ||
                 name.contains("MX+", ignoreCase = true) ||
@@ -42,7 +42,12 @@ class ObdConnection(
 
     @SuppressLint("MissingPermission")
     fun listBonded(): List<BluetoothDevice> {
-        return adapter.bondedDevices?.toList().orEmpty()
+        return try {
+            adapter.bondedDevices?.toList().orEmpty()
+        } catch (se: SecurityException) {
+            Log.w(TAG, "Bluetooth permission missing", se)
+            emptyList()
+        }
     }
 
     @SuppressLint("MissingPermission")

@@ -84,13 +84,13 @@ fun GearIndicator(
         Text(
             text = "GEAR",
             color = HudColors.TextDim,
-            fontSize = 12.sp,
+            fontSize = 13.sp,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.padding(bottom = 6.dp)
         )
         Box(
             modifier = Modifier
-                .size(width = 92.dp, height = 100.dp)
+                .size(width = 118.dp, height = 128.dp)
                 .clip(shape)
                 .background(panelColor, shape)
                 .border(2.dp, borderColor, shape),
@@ -99,7 +99,7 @@ fun GearIndicator(
             Text(
                 text = displayed,
                 color = HudColors.TextPrimary,
-                fontSize = 64.sp,
+                fontSize = 80.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.graphicsLayer {

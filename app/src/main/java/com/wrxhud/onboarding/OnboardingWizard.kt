@@ -108,8 +108,9 @@ fun OnboardingWizard(
                     if (page < PAGE_COUNT - 1) {
                         page++
                     } else {
+                        // Permissions first; onboardingComplete is set after the dialog returns
+                        // so OBD/GPS do not start without grants (avoids SecurityException crash).
                         onRequestPermissions()
-                        onUpdate { it.copy(onboardingComplete = true) }
                         onFinished()
                     }
                 },

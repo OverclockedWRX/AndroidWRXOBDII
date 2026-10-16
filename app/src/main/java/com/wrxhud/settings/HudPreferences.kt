@@ -1,6 +1,7 @@
 package com.wrxhud.settings
 
 import com.wrxhud.gps.GpsSourceMode
+import com.wrxhud.obd.PidAssignment
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -33,6 +34,7 @@ data class HudPreferences(
         GaugeId.OIL_TEMP,
         GaugeId.INTAKE_AIR_TEMP,
         GaugeId.BOOST,
+        GaugeId.AFR,
         GaugeId.BATTERY
     ),
     val enabledLamps: Set<LampId> = setOf(
@@ -43,6 +45,7 @@ data class HudPreferences(
         LampId.HIGH_IAT,
         LampId.OVERBOOST,
         LampId.LOW_BATTERY,
+        LampId.LOW_OIL_PRESSURE,
         LampId.LINK_LOST,
         LampId.GPS_LOST,
         LampId.KNOCK,
@@ -70,6 +73,8 @@ data class HudPreferences(
     val gpsSourceMode: GpsSourceMode = GpsSourceMode.AUTO,
     /** Optional bonded BT GPS MAC; empty = auto-pick by device name. */
     val bluetoothGpsAddress: String = "",
+    /** User PID/DID mappings from the scanner; empty = auto discovery defaults. */
+    val pidAssignments: List<PidAssignment> = emptyList(),
     val coolantAmberC: Float = 105f,
     val coolantRedC: Float = 115f,
     val oilTempAmberC: Float = 120f,
@@ -79,7 +84,9 @@ data class HudPreferences(
     val boostAmberPsi: Float = 18f,
     val boostRedPsi: Float = 22f,
     val lowFuelPercent: Float = 15f,
-    val lowBatteryVolts: Float = 12.0f
+    val lowBatteryVolts: Float = 12.0f,
+    val oilPressureAmberPsi: Float = 15f,
+    val oilPressureRedPsi: Float = 10f
 ) {
     fun toAlarmThresholds(): WrxProfile.AlarmThresholds = WrxProfile.AlarmThresholds(
         coolantAmberC = coolantAmberC,
@@ -91,6 +98,11 @@ data class HudPreferences(
         boostAmberPsi = boostAmberPsi,
         boostRedPsi = boostRedPsi,
         lowFuelPercent = lowFuelPercent,
-        lowBatteryVolts = lowBatteryVolts
+        lowBatteryVolts = lowBatteryVolts,
+        oilPressureAmberPsi = oilPressureAmberPsi,
+        oilPressureRedPsi = oilPressureRedPsi
     )
+
+    fun assignmentFor(signal: com.wrxhud.obd.MappableSignal): PidAssignment? =
+        pidAssignments.firstOrNull { it.signal == signal }
 }

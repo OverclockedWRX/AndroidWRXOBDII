@@ -137,6 +137,9 @@ class SimulatedObdSource(
                 oilTempSource = "sim",
                 intakeAirTempC = iat,
                 boostPsi = boost,
+                afr = (14.7f + 1.2f * sin(t * 0.9).toFloat()).coerceIn(11.5f, 16.2f),
+                oilPressurePsi = (35f + 15f * (rpm / redlineRpm.toFloat()).coerceIn(0.2f, 1f)
+                    + 3f * sin(t * 0.6).toFloat()).coerceIn(8f, 60f),
                 batteryVolts = battery,
                 fuelLevelPercent = fuel,
                 milOn = alert(ALERT_CEL),

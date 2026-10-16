@@ -92,11 +92,20 @@ class HudCarScreen(carContext: CarContext) : Screen(carContext) {
                 "${UnitConverters.formatTemp(snap.oilTempC, useF)}${if (useF) "°F" else "°C"}"
             )
         }
+        if (GaugeId.OIL_PRESSURE in prefs.enabledGauges) {
+            addRow(
+                "OIL PSI",
+                "${UnitConverters.formatPressure(snap.oilPressurePsi, prefs.pressureUnit)} ${prefs.pressureUnit.name}"
+            )
+        }
         if (GaugeId.INTAKE_AIR_TEMP in prefs.enabledGauges) {
             addRow(
                 "IAT",
                 "${UnitConverters.formatTemp(snap.intakeAirTempC, useF)}${if (useF) "°F" else "°C"}"
             )
+        }
+        if (GaugeId.AFR in prefs.enabledGauges) {
+            addRow("AFR", "${UnitConverters.formatAfr(snap.afr)} :1")
         }
         if (GaugeId.BATTERY in prefs.enabledGauges) {
             addRow("BATT", "${UnitConverters.formatVoltage(snap.batteryVolts)} V")

@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wrxhud.sensors.MotionReading
 import com.wrxhud.settings.HudPreferences
 import com.wrxhud.vehicle.AlarmEvaluator
 import com.wrxhud.vehicle.GaugeId
@@ -33,6 +34,7 @@ fun HudScreen(
     snapshot: VehicleSnapshot,
     preferences: HudPreferences,
     connectionStatus: String,
+    motion: MotionReading = MotionReading(),
     onOpenSettings: () -> Unit
 ) {
     val thresholds = preferences.toAlarmThresholds()
@@ -60,6 +62,7 @@ fun HudScreen(
                     thresholds = preferences.shiftLightStarts,
                     redline = preferences.redlineRpm,
                     pattern = preferences.shiftLightPattern,
+                    threeDimensional = preferences.rpmGauge3d,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = onOpenSettings) {
@@ -80,6 +83,7 @@ fun HudScreen(
                     sampleAgeMs = snapshot.rpmSampleAgeMs,
                     redline = preferences.redlineRpm,
                     gear = if (GaugeId.GEAR in preferences.enabledGauges) snapshot.gear else null,
+                    motion = motion,
                     threeDimensional = preferences.rpmGauge3d
                 )
             }
@@ -121,6 +125,21 @@ fun HudScreen(
                             modifier = Modifier.weight(1f)
                         )
                     }
+                    if (GaugeId.OIL_PRESSURE in preferences.enabledGauges) {
+                        GaugeTile(
+                            label = "OIL PSI",
+                            valueText = UnitConverters.formatPressure(
+                                snapshot.oilPressurePsi,
+                                preferences.pressureUnit
+                            ),
+                            unit = preferences.pressureUnit.name,
+                            severity = AlarmEvaluator.severityForOilPressure(
+                                snapshot.oilPressurePsi,
+                                thresholds
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     if (GaugeId.INTAKE_AIR_TEMP in preferences.enabledGauges) {
                         GaugeTile(
                             label = "IAT",
@@ -135,6 +154,15 @@ fun HudScreen(
                             psi = snapshot.boostPsi,
                             unit = preferences.pressureUnit,
                             severity = AlarmEvaluator.severityForBoost(snapshot.boostPsi, thresholds),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    if (GaugeId.AFR in preferences.enabledGauges) {
+                        GaugeTile(
+                            label = "AFR",
+                            valueText = UnitConverters.formatAfr(snapshot.afr),
+                            unit = ":1",
+                            severity = AlarmEvaluator.severityForAfr(snapshot.afr, thresholds),
                             modifier = Modifier.weight(1f)
                         )
                     }

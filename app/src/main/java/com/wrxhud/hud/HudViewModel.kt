@@ -10,6 +10,9 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.wrxhud.gps.GpsSpeedProvider
 import com.wrxhud.obd.ObdService
+import com.wrxhud.obd.PidScanRow
+import com.wrxhud.sensors.MotionReading
+import com.wrxhud.sensors.MotionSensorProvider
 import com.wrxhud.settings.HudPreferences
 import com.wrxhud.settings.SettingsRepository
 import com.wrxhud.telemetry.TelemetryHub
@@ -25,12 +28,14 @@ data class HudUiState(
     val snapshot: VehicleSnapshot = VehicleSnapshot(),
     val preferences: HudPreferences = HudPreferences(),
     val connectionStatus: String = "Idle",
+    val motion: MotionReading = MotionReading(),
     val runtimeStarted: Boolean = false
 )
 
 class HudViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(application)
     private val gps = GpsSpeedProvider(application)
+    private val motion = MotionSensorProvider(application)
 
     private val _serviceSnapshot = MutableStateFlow(VehicleSnapshot())
     private val _status = MutableStateFlow("Idle")
@@ -58,17 +63,23 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     val uiState: StateFlow<HudUiState> = combine(
-        _serviceSnapshot,
-        settingsRepository.preferencesFlow,
-        _status,
-        gps.reading,
-        _runtimeStarted
-    ) { snap, prefs, status, gpsReading, runtimeStarted ->
+        combine(
+            _serviceSnapshot,
+            settingsRepository.preferencesFlow,
+            _status,
+            gps.reading,
+            _runtimeStarted
+        ) { snap, prefs, status, gpsReading, runtimeStarted ->
+            Triple(snap to prefs, status to gpsReading, runtimeStarted)
+        },
+        motion.reading
+    ) { core, motionReading ->
+        val (snapPrefs, statusGps, runtimeStarted) = core
+        val (snap, prefs) = snapPrefs
+        val (status, gpsReading) = statusGps
         val gpsSpeed = gpsReading.speedMps
         val gpsFix = gpsReading.hasFix
 
-        // Simulator only when enabled; live OBD only when connected.
-        // Otherwise gauges freeze except phone GPS speed / fix.
         val hasObdStream = when {
             prefs.useSimulator -> snap.usingSimulator
             else -> snap.obdConnected && !snap.usingSimulator
@@ -105,6 +116,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             snapshot = displaySnap,
             preferences = prefs,
             connectionStatus = displayStatus,
+            motion = motionReading,
             runtimeStarted = runtimeStarted
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HudUiState())
@@ -123,10 +135,6 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /**
-     * Starts GPS + OBD/simulator only after onboarding finishes.
-     * Simulator runs exclusively when [HudPreferences.useSimulator] is true.
-     */
     fun startRuntimeIfNeeded(preferences: HudPreferences) {
         if (!preferences.onboardingComplete) return
         val gpsChanged = lastGpsMode != preferences.gpsSourceMode ||
@@ -138,6 +146,9 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
                 mode = preferences.gpsSourceMode,
                 bluetoothAddress = preferences.bluetoothGpsAddress.ifBlank { null }
             )
+            if (!_runtimeStarted.value) {
+                motion.start()
+            }
             _runtimeStarted.value = true
         }
         if (lastSimulatorSetting != preferences.useSimulator) {
@@ -156,7 +167,6 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         if (!bound) {
             app.bindService(intent, connection, Context.BIND_AUTO_CREATE)
         }
-        // Clear immediately so a disabled sim cannot leave stale gauge values on screen.
         if (!useSimulator) {
             _serviceSnapshot.value = VehicleSnapshot()
         }
@@ -177,8 +187,16 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** Run a live PID scan on the connected MX+. Empty if simulator / not connected. */
+    suspend fun scanPids(): List<PidScanRow> {
+        return service?.scanPids().orEmpty()
+    }
+
+    fun isLiveObdConnected(): Boolean = service?.isLiveConnected() == true
+
     override fun onCleared() {
         gps.destroy()
+        motion.stop()
         if (bound) {
             getApplication<Application>().unbindService(connection)
             bound = false

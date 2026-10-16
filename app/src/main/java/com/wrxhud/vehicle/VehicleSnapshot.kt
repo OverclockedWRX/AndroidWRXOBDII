@@ -19,6 +19,10 @@ data class VehicleSnapshot(
     val oilTempSource: String? = null,
     val intakeAirTempC: Float? = null,
     val boostPsi: Float? = null,
+    /** Gasoline AFR from λ × 14.7 (wideband / commanded eq ratio). */
+    val afr: Float? = null,
+    /** Engine oil pressure (psi), from user-mapped PID/DID when available. */
+    val oilPressurePsi: Float? = null,
     val batteryVolts: Float? = null,
     val fuelLevelPercent: Float? = null,
     val milOn: Boolean? = null,
@@ -61,7 +65,8 @@ data class AlarmState(
     val linkLost: Boolean = false,
     val gpsLost: Boolean = false,
     val knock: Boolean = false,
-    val dam: Boolean = false
+    val dam: Boolean = false,
+    val lowOilPressure: Boolean = false
 )
 
 enum class GaugeId {
@@ -70,8 +75,10 @@ enum class GaugeId {
     GEAR,
     COOLANT,
     OIL_TEMP,
+    OIL_PRESSURE,
     INTAKE_AIR_TEMP,
     BOOST,
+    AFR,
     BATTERY
 }
 
@@ -83,6 +90,7 @@ enum class LampId {
     HIGH_IAT,
     OVERBOOST,
     LOW_BATTERY,
+    LOW_OIL_PRESSURE,
     LINK_LOST,
     GPS_LOST,
     KNOCK,
