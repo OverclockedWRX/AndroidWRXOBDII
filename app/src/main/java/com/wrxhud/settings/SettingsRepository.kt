@@ -29,6 +29,7 @@ class SettingsRepository(private val context: Context) {
         val speedUnit = stringPreferencesKey("speed_unit")
         val pressureUnit = stringPreferencesKey("pressure_unit")
         val redline = intPreferencesKey("redline")
+        val shiftLightPattern = stringPreferencesKey("shift_light_pattern")
         val shiftLights = stringPreferencesKey("shift_lights")
         val useSpt = booleanPreferencesKey("use_spt")
         val tireWidth = intPreferencesKey("tire_width")
@@ -59,6 +60,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.speedUnit] = next.speedUnit.name
             prefs[Keys.pressureUnit] = next.pressureUnit.name
             prefs[Keys.redline] = next.redlineRpm
+            prefs[Keys.shiftLightPattern] = next.shiftLightPattern.name
             prefs[Keys.shiftLights] = next.shiftLightStarts.joinToString(",")
             prefs[Keys.useSpt] = next.useSptCvt
             prefs[Keys.tireWidth] = next.tireWidthMm
@@ -98,6 +100,9 @@ class SettingsRepository(private val context: Context) {
                 ?.let { runCatching { PressureUnit.valueOf(it) }.getOrNull() }
                 ?: defaults.pressureUnit,
             redlineRpm = this[Keys.redline] ?: defaults.redlineRpm,
+            shiftLightPattern = this[Keys.shiftLightPattern]
+                ?.let { runCatching { ShiftLightPattern.valueOf(it) }.getOrNull() }
+                ?: defaults.shiftLightPattern,
             shiftLightStarts = this[Keys.shiftLights]
                 ?.split(",")
                 ?.mapNotNull { it.trim().toIntOrNull() }

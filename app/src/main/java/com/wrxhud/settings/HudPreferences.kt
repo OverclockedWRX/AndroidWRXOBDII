@@ -7,6 +7,21 @@ import com.wrxhud.vehicle.SpeedUnit
 import com.wrxhud.vehicle.TempUnit
 import com.wrxhud.vehicle.WrxProfile
 
+enum class ShiftLightPattern {
+    LEFT_TO_RIGHT,
+    RIGHT_TO_LEFT,
+    OUTSIDE_IN,
+    INSIDE_OUT;
+
+    val label: String
+        get() = when (this) {
+            LEFT_TO_RIGHT -> "Left → right"
+            RIGHT_TO_LEFT -> "Right → left"
+            OUTSIDE_IN -> "Outside → in"
+            INSIDE_OUT -> "Inside → out"
+        }
+}
+
 data class HudPreferences(
     val onboardingComplete: Boolean = false,
     val enabledGauges: Set<GaugeId> = setOf(
@@ -36,6 +51,7 @@ data class HudPreferences(
     val speedUnit: SpeedUnit = SpeedUnit.MPH,
     val pressureUnit: PressureUnit = PressureUnit.PSI,
     val redlineRpm: Int = WrxProfile.REDLINE_RPM,
+    val shiftLightPattern: ShiftLightPattern = ShiftLightPattern.LEFT_TO_RIGHT,
     val shiftLightStarts: List<Int> = listOf(
         3300, 3600, 3900, 4200, 4500, 4800, 5100, 5400, 5700, 6100
     ),

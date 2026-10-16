@@ -184,6 +184,30 @@ fun SettingsScreen(
             }
 
             SectionTitle("Shift lights / redline")
+            Text(
+                text = "Fill pattern",
+                color = HudColors.TextDim,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ShiftLightPattern.entries.take(2).forEach { pattern ->
+                    FilterChip(
+                        selected = preferences.shiftLightPattern == pattern,
+                        onClick = { onUpdate { it.copy(shiftLightPattern = pattern) } },
+                        label = { Text(pattern.label) }
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ShiftLightPattern.entries.drop(2).forEach { pattern ->
+                    FilterChip(
+                        selected = preferences.shiftLightPattern == pattern,
+                        onClick = { onUpdate { it.copy(shiftLightPattern = pattern) } },
+                        label = { Text(pattern.label) }
+                    )
+                }
+            }
             IntField(
                 label = "Redline RPM",
                 value = preferences.redlineRpm,

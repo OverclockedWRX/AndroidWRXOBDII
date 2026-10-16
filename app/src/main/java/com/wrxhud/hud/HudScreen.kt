@@ -53,6 +53,7 @@ fun HudScreen(
                 rpm = snapshot.rpm,
                 thresholds = preferences.shiftLightStarts,
                 redline = preferences.redlineRpm,
+                pattern = preferences.shiftLightPattern,
                 modifier = Modifier.weight(1f)
             )
             IconButton(onClick = onOpenSettings) {
