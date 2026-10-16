@@ -33,7 +33,10 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import com.wrxhud.hud.HudColors
+import com.wrxhud.telemetry.AppPage
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -88,6 +91,33 @@ fun SettingsScreen(
                     checked = preferences.useSimulator,
                     onCheckedChange = { checked -> onUpdate { it.copy(useSimulator = checked) } }
                 )
+            }
+
+            SectionTitle("Default tab")
+            Text(
+                text = "HUD is recommended. Navigation uses Google Maps on the phone only (not Android Auto).",
+                color = HudColors.TextDim,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = preferences.defaultPage == AppPage.HUD,
+                    onClick = { onUpdate { it.copy(defaultPage = AppPage.HUD) } },
+                    label = { Text("HUD") }
+                )
+                FilterChip(
+                    selected = preferences.defaultPage == AppPage.NAVIGATION,
+                    onClick = { onUpdate { it.copy(defaultPage = AppPage.NAVIGATION) } },
+                    label = { Text("Navigation") }
+                )
+            }
+
+            Button(
+                onClick = { onUpdate { it.copy(onboardingComplete = false) } },
+                colors = ButtonDefaults.buttonColors(containerColor = HudColors.Panel)
+            ) {
+                Text("Run setup wizard again", color = HudColors.TextPrimary, fontFamily = FontFamily.Monospace)
             }
 
             SectionTitle("Gauges")
