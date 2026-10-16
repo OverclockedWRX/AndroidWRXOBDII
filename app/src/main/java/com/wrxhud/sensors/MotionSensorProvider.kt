@@ -43,8 +43,11 @@ class MotionSensorProvider(context: Context) : SensorEventListener {
     private var latestPitch: Float? = null
     private var latestRoll: Float? = null
     private var latestYaw: Float? = null
+    private var started = false
 
     fun start() {
+        if (started) return
+        started = true
         val rate = SensorManager.SENSOR_DELAY_UI
         rotationSensor?.let { sensorManager.registerListener(this, it, rate) }
         accelerometer?.let { sensorManager.registerListener(this, it, rate) }
@@ -54,6 +57,8 @@ class MotionSensorProvider(context: Context) : SensorEventListener {
     }
 
     fun stop() {
+        if (!started) return
+        started = false
         sensorManager.unregisterListener(this)
     }
 

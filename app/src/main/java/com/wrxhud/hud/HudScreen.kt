@@ -84,6 +84,7 @@ fun HudScreen(
                     redline = preferences.redlineRpm,
                     gear = if (GaugeId.GEAR in preferences.enabledGauges) snapshot.gear else null,
                     motion = motion,
+                    motionDisplayMode = preferences.motionDisplayMode,
                     threeDimensional = preferences.rpmGauge3d
                 )
             }

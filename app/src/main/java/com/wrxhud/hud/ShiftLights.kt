@@ -206,7 +206,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLamp3d(
 
 data class ShiftLampState(
     val lit: Boolean,
-    /** Stage in the RPM sequence (0 = first to light). Drives green→amber→red. */
+    /** Stage in the RPM sequence (0 = first to light). Drives blue→green→amber→red. */
     val stageIndex: Int
 )
 
@@ -299,9 +299,11 @@ fun shiftLightColor(stageIndex: Int, lit: Boolean, stageCount: Int = SHIFT_LIGHT
     if (!lit) return HudColors.LampOff
     val last = (stageCount - 1).coerceAtLeast(1)
     val t = stageIndex.toFloat() / last
+    // Blue → green → amber → red as RPM climbs toward redline.
     return when {
         t >= 0.8f -> HudColors.Red
-        t >= 0.5f -> HudColors.Amber
-        else -> HudColors.Green
+        t >= 0.55f -> HudColors.Amber
+        t >= 0.3f -> HudColors.Green
+        else -> HudColors.BoostBlue
     }
 }

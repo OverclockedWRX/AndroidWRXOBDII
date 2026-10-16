@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.wrxhud.hud.AttitudeCalibrationScreen
 import com.wrxhud.hud.HudColors
 import com.wrxhud.hud.HudThemeController
 import com.wrxhud.hud.HudViewModel
@@ -43,10 +44,12 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val ui by viewModel.uiState.collectAsState()
+            val rawMotion by viewModel.rawMotion.collectAsState()
 
             LaunchedEffect(ui.preferences.onboardingComplete) {
                 if (ui.preferences.onboardingComplete) {
                     viewModel.startRuntimeIfNeeded(ui.preferences)
+                    viewModel.ensureMotionStarted()
                 }
             }
 
@@ -58,20 +61,33 @@ class MainActivity : ComponentActivity() {
                 modifier = Modifier.fillMaxSize(),
                 color = HudColors.Background
             ) {
-                if (!ui.preferences.onboardingComplete) {
-                    OnboardingWizard(
-                        preferences = ui.preferences,
-                        onUpdate = viewModel::updatePreferences,
-                        onRequestPermissions = { requestNeededPermissions() },
-                        onFinished = { }
-                    )
-                } else {
-                    AppShell(
-                        ui = ui,
-                        onUpdatePreferences = viewModel::updatePreferences,
-                        onScanPids = { viewModel.scanPids() },
-                        connectionStatus = ui.connectionStatus
-                    )
+                when {
+                    !ui.preferences.onboardingComplete -> {
+                        OnboardingWizard(
+                            preferences = ui.preferences,
+                            onUpdate = viewModel::updatePreferences,
+                            onRequestPermissions = { requestNeededPermissions() },
+                            onFinished = { }
+                        )
+                    }
+                    !ui.preferences.motionCalibrated -> {
+                        LaunchedEffect(Unit) { viewModel.ensureMotionStarted() }
+                        AttitudeCalibrationScreen(
+                            motion = rawMotion,
+                            getLiveMotion = { viewModel.rawMotionNow() },
+                            isRecalibration = false,
+                            onCalibrated = viewModel::saveMountCalibration
+                        )
+                    }
+                    else -> {
+                        AppShell(
+                            ui = ui,
+                            onUpdatePreferences = viewModel::updatePreferences,
+                            onScanPids = { viewModel.scanPids() },
+                            connectionStatus = ui.connectionStatus,
+                            onRecalibrateMotion = viewModel::clearMountCalibration
+                        )
+                    }
                 }
             }
         }
@@ -122,5 +138,6 @@ class MainActivity : ComponentActivity() {
         viewModel.updatePreferences { it.copy(onboardingComplete = true) }
         val prefs = viewModel.uiState.value.preferences.copy(onboardingComplete = true)
         viewModel.startRuntimeIfNeeded(prefs)
+        viewModel.ensureMotionStarted()
     }
 }

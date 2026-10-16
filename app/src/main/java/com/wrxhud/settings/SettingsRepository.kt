@@ -41,6 +41,12 @@ class SettingsRepository(private val context: Context) {
         val pinkyMode = booleanPreferencesKey("pinky_mode")
         val dangerToManifold = booleanPreferencesKey("danger_to_manifold")
         val rpmGauge3d = booleanPreferencesKey("rpm_gauge_3d")
+        val motionDisplayMode = stringPreferencesKey("motion_display_mode")
+        val motionCalibrated = booleanPreferencesKey("motion_calibrated")
+        val motionCalibPitch = floatPreferencesKey("motion_calib_pitch")
+        val motionCalibRoll = floatPreferencesKey("motion_calib_roll")
+        val motionCalibYaw = floatPreferencesKey("motion_calib_yaw")
+        val motionCalibG = floatPreferencesKey("motion_calib_g")
         val gpsSourceMode = stringPreferencesKey("gps_source_mode")
         val bluetoothGpsAddress = stringPreferencesKey("bluetooth_gps_address")
         val coolantAmber = floatPreferencesKey("coolant_amber")
@@ -80,6 +86,12 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.pinkyMode] = next.pinkyMode
             prefs[Keys.dangerToManifold] = next.dangerToManifold
             prefs[Keys.rpmGauge3d] = next.rpmGauge3d
+            prefs[Keys.motionDisplayMode] = next.motionDisplayMode.name
+            prefs[Keys.motionCalibrated] = next.motionCalibrated
+            prefs[Keys.motionCalibPitch] = next.motionCalibPitchDeg
+            prefs[Keys.motionCalibRoll] = next.motionCalibRollDeg
+            prefs[Keys.motionCalibYaw] = next.motionCalibYawDeg
+            prefs[Keys.motionCalibG] = next.motionCalibGForce
             prefs[Keys.gpsSourceMode] = next.gpsSourceMode.name
             prefs[Keys.bluetoothGpsAddress] = next.bluetoothGpsAddress
             prefs[Keys.coolantAmber] = next.coolantAmberC
@@ -134,6 +146,14 @@ class SettingsRepository(private val context: Context) {
             pinkyMode = this[Keys.pinkyMode] ?: defaults.pinkyMode,
             dangerToManifold = this[Keys.dangerToManifold] ?: defaults.dangerToManifold,
             rpmGauge3d = this[Keys.rpmGauge3d] ?: defaults.rpmGauge3d,
+            motionDisplayMode = this[Keys.motionDisplayMode]
+                ?.let { runCatching { MotionDisplayMode.valueOf(it) }.getOrNull() }
+                ?: defaults.motionDisplayMode,
+            motionCalibrated = this[Keys.motionCalibrated] ?: defaults.motionCalibrated,
+            motionCalibPitchDeg = this[Keys.motionCalibPitch] ?: defaults.motionCalibPitchDeg,
+            motionCalibRollDeg = this[Keys.motionCalibRoll] ?: defaults.motionCalibRollDeg,
+            motionCalibYawDeg = this[Keys.motionCalibYaw] ?: defaults.motionCalibYawDeg,
+            motionCalibGForce = this[Keys.motionCalibG] ?: defaults.motionCalibGForce,
             gpsSourceMode = this[Keys.gpsSourceMode]
                 ?.let { runCatching { GpsSourceMode.valueOf(it) }.getOrNull() }
                 ?: defaults.gpsSourceMode,

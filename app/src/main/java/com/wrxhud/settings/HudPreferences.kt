@@ -69,6 +69,14 @@ data class HudPreferences(
     val dangerToManifold: Boolean = false,
     /** Extruded / beveled 3D look for the RPM bar tach. */
     val rpmGauge3d: Boolean = false,
+    /** How pitch / roll / yaw are shown next to the tach. */
+    val motionDisplayMode: MotionDisplayMode = MotionDisplayMode.TRIPLE,
+    /** True after the user completes the in-car mount accelerometer test. */
+    val motionCalibrated: Boolean = false,
+    val motionCalibPitchDeg: Float = 0f,
+    val motionCalibRollDeg: Float = 0f,
+    val motionCalibYawDeg: Float = 0f,
+    val motionCalibGForce: Float = 1f,
     /** Built-in / Bluetooth / USB / Auto GPS source selection. */
     val gpsSourceMode: GpsSourceMode = GpsSourceMode.AUTO,
     /** Optional bonded BT GPS MAC; empty = auto-pick by device name. */
@@ -105,4 +113,12 @@ data class HudPreferences(
 
     fun assignmentFor(signal: com.wrxhud.obd.MappableSignal): PidAssignment? =
         pidAssignments.firstOrNull { it.signal == signal }
+
+    fun mountCalibration(): com.wrxhud.sensors.MotionMountCalibration =
+        com.wrxhud.sensors.MotionMountCalibration(
+            pitchDeg = motionCalibPitchDeg,
+            rollDeg = motionCalibRollDeg,
+            yawDeg = motionCalibYawDeg,
+            gForce = motionCalibGForce
+        )
 }

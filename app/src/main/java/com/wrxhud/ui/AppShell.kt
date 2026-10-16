@@ -15,7 +15,8 @@ fun AppShell(
     ui: HudUiState,
     onUpdatePreferences: ((com.wrxhud.settings.HudPreferences) -> com.wrxhud.settings.HudPreferences) -> Unit,
     onScanPids: suspend () -> List<PidScanRow> = { emptyList() },
-    connectionStatus: String = ui.connectionStatus
+    connectionStatus: String = ui.connectionStatus,
+    onRecalibrateMotion: () -> Unit = {}
 ) {
     var showSettings by remember { mutableStateOf(false) }
 
@@ -25,7 +26,11 @@ fun AppShell(
             onBack = { showSettings = false },
             onUpdate = onUpdatePreferences,
             onScanPids = onScanPids,
-            connectionStatus = connectionStatus
+            connectionStatus = connectionStatus,
+            onRecalibrateMotion = {
+                showSettings = false
+                onRecalibrateMotion()
+            }
         )
         return
     }

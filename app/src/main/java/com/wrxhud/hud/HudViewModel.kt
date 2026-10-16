@@ -11,8 +11,10 @@ import androidx.lifecycle.viewModelScope
 import com.wrxhud.gps.GpsSpeedProvider
 import com.wrxhud.obd.ObdService
 import com.wrxhud.obd.PidScanRow
+import com.wrxhud.sensors.MotionMountCalibration
 import com.wrxhud.sensors.MotionReading
 import com.wrxhud.sensors.MotionSensorProvider
+import com.wrxhud.sensors.relativeTo
 import com.wrxhud.settings.HudPreferences
 import com.wrxhud.settings.SettingsRepository
 import com.wrxhud.telemetry.TelemetryHub
@@ -112,11 +114,16 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         TelemetryHub.publishPreferences(prefs)
         TelemetryHub.publishStatus(displayStatus)
 
+        val calibratedMotion = motionReading.relativeTo(
+            calib = prefs.mountCalibration(),
+            calibrated = prefs.motionCalibrated
+        )
+
         HudUiState(
             snapshot = displaySnap,
             preferences = prefs,
             connectionStatus = displayStatus,
-            motion = motionReading,
+            motion = calibratedMotion,
             runtimeStarted = runtimeStarted
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HudUiState())
@@ -137,6 +144,8 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
 
     fun startRuntimeIfNeeded(preferences: HudPreferences) {
         if (!preferences.onboardingComplete) return
+        // Attitude sensors must run before mount calibration completes.
+        ensureMotionStarted()
         val gpsChanged = lastGpsMode != preferences.gpsSourceMode ||
             lastBluetoothGpsAddress != preferences.bluetoothGpsAddress
         if (!_runtimeStarted.value || gpsChanged) {
@@ -146,14 +155,44 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
                 mode = preferences.gpsSourceMode,
                 bluetoothAddress = preferences.bluetoothGpsAddress.ifBlank { null }
             )
-            if (!_runtimeStarted.value) {
-                motion.start()
-            }
             _runtimeStarted.value = true
         }
         if (lastSimulatorSetting != preferences.useSimulator) {
             lastSimulatorSetting = preferences.useSimulator
             startObd(useSimulator = preferences.useSimulator)
+        }
+    }
+
+    fun ensureMotionStarted() {
+        motion.start()
+    }
+
+    /** Raw (uncalibrated) reading for the mount test UI. */
+    val rawMotion: StateFlow<MotionReading> = motion.reading
+
+    fun rawMotionNow(): MotionReading = motion.reading.value
+
+    fun saveMountCalibration(calib: MotionMountCalibration) {
+        updatePreferences { prefs ->
+            prefs.copy(
+                motionCalibrated = true,
+                motionCalibPitchDeg = calib.pitchDeg,
+                motionCalibRollDeg = calib.rollDeg,
+                motionCalibYawDeg = calib.yawDeg,
+                motionCalibGForce = calib.gForce
+            )
+        }
+    }
+
+    fun clearMountCalibration() {
+        updatePreferences {
+            it.copy(
+                motionCalibrated = false,
+                motionCalibPitchDeg = 0f,
+                motionCalibRollDeg = 0f,
+                motionCalibYawDeg = 0f,
+                motionCalibGForce = 1f
+            )
         }
     }
 

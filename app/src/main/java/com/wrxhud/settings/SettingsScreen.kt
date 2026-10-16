@@ -53,7 +53,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onUpdate: ((HudPreferences) -> HudPreferences) -> Unit,
     onScanPids: suspend () -> List<com.wrxhud.obd.PidScanRow> = { emptyList() },
-    connectionStatus: String = ""
+    connectionStatus: String = "",
+    onRecalibrateMotion: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val versionLabel = remember(context) {
@@ -221,6 +222,51 @@ fun SettingsScreen(
                 Switch(
                     checked = preferences.rpmGauge3d,
                     onCheckedChange = { checked -> onUpdate { it.copy(rpmGauge3d = checked) } }
+                )
+            }
+
+            Text(
+                "Attitude display",
+                color = HudColors.TextPrimary,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Pitch / roll / yaw: text strip, three circular car gauges, or one combined attitude ring.",
+                color = HudColors.TextDim,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MotionDisplayMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = preferences.motionDisplayMode == mode,
+                        onClick = { onUpdate { it.copy(motionDisplayMode = mode) } },
+                        label = { Text(mode.label, fontFamily = FontFamily.Monospace) }
+                    )
+                }
+            }
+
+            Text(
+                if (preferences.motionCalibrated) {
+                    "Mount calibrated (P ${"%.0f".format(preferences.motionCalibPitchDeg)}° / " +
+                        "R ${"%.0f".format(preferences.motionCalibRollDeg)}° / " +
+                        "Y ${"%.0f".format(preferences.motionCalibYawDeg)}°)"
+                } else {
+                    "Mount not calibrated — attitude may be wrong until you run the test."
+                },
+                color = if (preferences.motionCalibrated) HudColors.Green else HudColors.Amber,
+                fontSize = 12.sp,
+                fontFamily = FontFamily.Monospace
+            )
+            Button(
+                onClick = onRecalibrateMotion,
+                colors = ButtonDefaults.buttonColors(containerColor = HudColors.Panel)
+            ) {
+                Text(
+                    "Recalibrate mount attitude",
+                    color = HudColors.TextPrimary,
+                    fontFamily = FontFamily.Monospace
                 )
             }
 
