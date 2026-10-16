@@ -50,13 +50,6 @@ class StnParserTest {
     }
 
     @Test
-    fun decodeOdometerKm() {
-        // 42150.0 km → raw = 421500 = 0x00066E7C
-        val data = StnParser.parseMode01("41 A6 00 06 6E 7C", 0xA6)!!
-        assertThat(StnParser.decodeOdometerKm(data)).isWithin(0.1f).of(42_150f)
-    }
-
-    @Test
     fun supportedPidBitmask() {
         // Bit 0 of first byte = PID 01 supported when MSB set in first nibble of response pattern
         val data = byteArrayOf(0xBE.toByte(), 0x1F, 0xA8.toByte(), 0x13)

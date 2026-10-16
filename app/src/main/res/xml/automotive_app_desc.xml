@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <automotiveApp>
-    <!-- Template-based Android Auto app (HUD gauges only; no navigation). -->
+    <!-- Template-based Android Auto app (instrument / HUD gauges). -->
     <uses name="template" />
 </automotiveApp>

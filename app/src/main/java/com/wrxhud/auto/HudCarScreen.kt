@@ -20,7 +20,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
- * Android Auto HUD: key gauges only. No Navigation tab / Maps here.
+ * Android Auto instrument display: key gauges only.
  */
 class HudCarScreen(carContext: CarContext) : Screen(carContext) {
     private var collectJob: Job? = null

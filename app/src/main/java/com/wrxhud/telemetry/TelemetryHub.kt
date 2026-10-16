@@ -31,8 +31,3 @@ object TelemetryHub {
         _status.value = value
     }
 }
-
-enum class AppPage {
-    HUD,
-    NAVIGATION
-}

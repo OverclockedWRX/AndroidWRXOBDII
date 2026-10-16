@@ -145,19 +145,6 @@ fun HudScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                if (GaugeId.ODOMETER in preferences.enabledGauges) {
-                    GaugeTile(
-                        label = "ODO",
-                        valueText = UnitConverters.formatOdometer(snapshot.odometerKm, useMph),
-                        unit = if (useMph) "MI" else "KM",
-                        severity = if (snapshot.odometerKm == null) {
-                            AlarmEvaluator.Severity.NONE
-                        } else {
-                            AlarmEvaluator.Severity.NORMAL
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
             }
         }
 

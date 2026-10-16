@@ -10,7 +10,6 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.wrxhud.telemetry.AppPage
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -24,7 +23,6 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class SettingsRepository(private val context: Context) {
     private object Keys {
         val onboarding = booleanPreferencesKey("onboarding_complete")
-        val defaultPage = stringPreferencesKey("default_page")
         val gauges = stringSetPreferencesKey("gauges")
         val lamps = stringSetPreferencesKey("lamps")
         val tempUnit = stringPreferencesKey("temp_unit")
@@ -55,7 +53,6 @@ class SettingsRepository(private val context: Context) {
         context.dataStore.edit { prefs ->
             val next = transform(prefs.toHudPreferences())
             prefs[Keys.onboarding] = next.onboardingComplete
-            prefs[Keys.defaultPage] = next.defaultPage.name
             prefs[Keys.gauges] = next.enabledGauges.map { it.name }.toSet()
             prefs[Keys.lamps] = next.enabledLamps.map { it.name }.toSet()
             prefs[Keys.tempUnit] = next.tempUnit.name
@@ -85,9 +82,6 @@ class SettingsRepository(private val context: Context) {
         val defaults = HudPreferences()
         return HudPreferences(
             onboardingComplete = this[Keys.onboarding] ?: defaults.onboardingComplete,
-            defaultPage = this[Keys.defaultPage]
-                ?.let { runCatching { AppPage.valueOf(it) }.getOrNull() }
-                ?: defaults.defaultPage,
             enabledGauges = this[Keys.gauges]
                 ?.mapNotNull { runCatching { GaugeId.valueOf(it) }.getOrNull() }
                 ?.toSet()

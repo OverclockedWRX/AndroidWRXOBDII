@@ -5,7 +5,7 @@ import androidx.car.app.CarAppService
 import androidx.car.app.Session
 import androidx.car.app.validation.HostValidator
 /**
- * Android Auto entry point. Hosts the race HUD only — no in-car navigation
+ * Android Auto entry point. Hosts the race instrument / HUD display.
  * (Google Maps on Android Auto handles routing separately).
  */
 class WrxCarAppService : CarAppService() {

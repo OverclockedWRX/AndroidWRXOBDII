@@ -32,14 +32,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.hud.HudColors
 import com.wrxhud.settings.HudPreferences
-import com.wrxhud.telemetry.AppPage
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
 import com.wrxhud.vehicle.SpeedUnit
 import com.wrxhud.vehicle.TempUnit
 
-private const val PAGE_COUNT = 7
+private const val PAGE_COUNT = 6
 
 @Composable
 fun OnboardingWizard(
@@ -90,8 +89,7 @@ fun OnboardingWizard(
                 2 -> GaugesPage(preferences, onUpdate)
                 3 -> LampsPage(preferences, onUpdate)
                 4 -> UnitsPage(preferences, onUpdate)
-                5 -> DefaultPageChooser(preferences, onUpdate)
-                6 -> PermissionsPage()
+                5 -> PermissionsPage()
             }
         }
 
@@ -135,7 +133,7 @@ private fun WelcomePage() {
     Spacer(Modifier.height(12.dp))
     Text(
         text = "This wizard configures your race HUD for a 2022+ Subaru WRX with an OBDLink MX+.\n\n" +
-            "You will choose gauges, warning lamps, units, and the default home tab.\n\n" +
+            "You will choose gauges, warning lamps, and units.\n\n" +
             "Android permissions (Bluetooth, location, notifications) are requested on the last step only.",
         color = HudColors.TextPrimary,
         fontSize = 15.sp,
@@ -261,39 +259,12 @@ private fun UnitsPage(
 }
 
 @Composable
-private fun DefaultPageChooser(
-    preferences: HudPreferences,
-    onUpdate: ((HudPreferences) -> HudPreferences) -> Unit
-) {
-    PageTitle("Default tab")
-    Text(
-        text = "HUD is recommended as the default. You can switch tabs anytime.",
-        color = HudColors.TextDim,
-        fontSize = 13.sp,
-        fontFamily = FontFamily.Monospace
-    )
-    Spacer(Modifier.height(12.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        FilterChip(
-            selected = preferences.defaultPage == AppPage.HUD,
-            onClick = { onUpdate { it.copy(defaultPage = AppPage.HUD) } },
-            label = { Text("HUD") }
-        )
-        FilterChip(
-            selected = preferences.defaultPage == AppPage.NAVIGATION,
-            onClick = { onUpdate { it.copy(defaultPage = AppPage.NAVIGATION) } },
-            label = { Text("Navigation") }
-        )
-    }
-}
-
-@Composable
 private fun PermissionsPage() {
     PageTitle("Permissions")
     Text(
         text = "The next step asks Android for:\n\n" +
             "• Nearby devices / Bluetooth — talk to the OBDLink MX+\n" +
-            "• Location — GPS speed and Google Maps navigation\n" +
+            "• Location — GPS speed display\n" +
             "• Notifications — keep the OBD service alive\n\n" +
             "Tap “Grant access & start” to continue.",
         color = HudColors.TextPrimary,

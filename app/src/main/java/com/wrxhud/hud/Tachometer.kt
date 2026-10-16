@@ -176,27 +176,11 @@ fun Tachometer(
             )
         }
 
-        Box(
+        GearIndicator(
+            gear = gear,
             modifier = Modifier
                 .padding(start = 16.dp)
-                .fillMaxHeight(),
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = "GEAR",
-                    color = HudColors.TextDim,
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace
-                )
-                Text(
-                    text = UnitConverters.formatGear(gear),
-                    color = HudColors.TextPrimary,
-                    fontSize = 72.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-            }
-        }
+                .fillMaxHeight()
+        )
     }
 }

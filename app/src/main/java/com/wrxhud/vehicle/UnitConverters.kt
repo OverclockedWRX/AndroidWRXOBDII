@@ -44,14 +44,6 @@ object UnitConverters {
         return "%.1f".format(volts)
     }
 
-    fun kmToMiles(km: Float): Float = km * 0.621371f
-
-    fun formatOdometer(km: Float?, useMiles: Boolean): String {
-        if (km == null) return "—"
-        val value = if (useMiles) kmToMiles(km) else km
-        return "%,.0f".format(value)
-    }
-
     fun formatRpm(rpm: Float?): String {
         if (rpm == null) return "—"
         return "%.0f".format(rpm)

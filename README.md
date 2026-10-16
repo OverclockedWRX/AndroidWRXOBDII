@@ -1,16 +1,15 @@
 # WRX Race HUD
 
-Android 15+ race HUD for **2022–present Subaru WRX (VB / FA24)** using an **OBDLink MX+**.
+Android 15+ race instrument / HUD for **2022–present Subaru WRX (VB / FA24)** using an **OBDLink MX+**.
 
 ## Features
 
 - First-run setup wizard (permissions requested only on the last step)
-- Tabs: **HUD** (default) and **Navigation** (Google Maps on the phone)
-- Android Auto template HUD (gauges only — navigation stays in Google Maps for AA)
+- Full-screen instrument display (phone + Android Auto template HUD)
 - AiM-style shift lights and bar tachometer with frame-timed RPM interpolation
 - GPS speed display (phone GPS)
 - Calculated gear (6MT or SPT/CVT ratios + tire size)
-- Toggleable gauges: coolant, oil temp, IAT, boost, battery, odometer (when ECU supports it)
+- Toggleable gauges: coolant, oil temp, IAT, boost, battery
 - Zone-colored tach bar (green → amber → red toward redline)
 - Warning lamps: CEL, low fuel, temps, overboost, battery, OBD/GPS link, knock/DAM (when Mode 22 DIDs are confirmed)
 - Simulator mode for UI development without a car
@@ -35,12 +34,11 @@ Download sideload APKs from **[GitHub Releases](https://github.com/OverclockedWR
 
 ## First run
 
-1. Launch **WRX Race HUD** and complete the setup wizard (gauges, lamps, units, default tab).
+1. Launch **WRX Race HUD** and complete the setup wizard (gauges, lamps, units).
 2. On the last wizard page, grant Bluetooth / location / notification permissions.
 3. Pair the OBDLink MX+ in Android Bluetooth settings if using a live car.
 4. Turn **off** simulator in Settings to connect live.
-5. Use the **HUD** / **NAVIGATION** tabs freely. Default tab is configurable in Settings.
-6. Android Auto: open WRX Race HUD from the AA launcher for gauges; use Google Maps AA for routing.
+5. Android Auto: open WRX Race HUD from the AA launcher for gauges.
 
 ## Vehicle notes
 
@@ -51,7 +49,6 @@ Download sideload APKs from **[GitHub Releases](https://github.com/OverclockedWR
 | Gear | Calculated from OBD speed + RPM + WRX ratios |
 | Oil temp | Auto-probed: Mode 01 `5C`, then Mode 22 `0113` / `1153` (header `7E0`) |
 | Oil pressure | Not available (VB has a switch only, no PSI sensor on OBD) |
-| Odometer | Mode 01 `A6` when supported — many 2022+ WRXs return unsupported; tile shows — |
 | Coolant vs “water temp” | Same ECT sensor on FA24 (one Coolant tile) |
 
 ## Confirming oil-temp DIDs

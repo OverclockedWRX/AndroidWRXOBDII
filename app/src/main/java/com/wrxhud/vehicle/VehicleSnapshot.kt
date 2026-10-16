@@ -21,8 +21,6 @@ data class VehicleSnapshot(
     val boostPsi: Float? = null,
     val batteryVolts: Float? = null,
     val fuelLevelPercent: Float? = null,
-    /** Odometer in kilometers when Mode 01 PID A6 (or equivalent) is available. */
-    val odometerKm: Float? = null,
     val milOn: Boolean? = null,
     val knockActive: Boolean? = null,
     val damLow: Boolean? = null,
@@ -53,8 +51,7 @@ enum class GaugeId {
     OIL_TEMP,
     INTAKE_AIR_TEMP,
     BOOST,
-    BATTERY,
-    ODOMETER
+    BATTERY
 }
 
 enum class LampId {
