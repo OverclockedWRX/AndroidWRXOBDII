@@ -4,6 +4,9 @@ Android 15+ race HUD for **2022–present Subaru WRX (VB / FA24)** using an **OB
 
 ## Features
 
+- First-run setup wizard (permissions requested only on the last step)
+- Tabs: **HUD** (default) and **Navigation** (Google Maps on the phone)
+- Android Auto template HUD (gauges only — navigation stays in Google Maps for AA)
 - AiM-style shift lights and bar tachometer with frame-timed RPM interpolation
 - GPS speed display (phone GPS)
 - Calculated gear (6MT or SPT/CVT ratios + tire size)
@@ -28,14 +31,16 @@ Open the project in Android Studio (Ladybug or newer) or:
 ./gradlew :app:assembleDebug
 ```
 
-Install the APK from [`releases/WRXRaceHUD-0.1.0-debug.apk`](releases/WRXRaceHUD-0.1.0-debug.apk), or build with Gradle and use `app/build/outputs/apk/debug/`.
+Download sideload APKs from **[GitHub Releases](https://github.com/OverclockedWRX/AndroidWRXOBDII/releases)** (private — collaborators only). Or build locally with Gradle (`app/build/outputs/apk/debug/`). APKs are not committed to git.
 
 ## First run
 
-1. Pair the OBDLink MX+ in Android Bluetooth settings.
-2. Launch **WRX Race HUD**.
-3. Open Settings (gear icon) and turn **off** “Use simulator” to connect live.
-4. Keep the phone landscape and mounted as a dash display.
+1. Launch **WRX Race HUD** and complete the setup wizard (gauges, lamps, units, default tab).
+2. On the last wizard page, grant Bluetooth / location / notification permissions.
+3. Pair the OBDLink MX+ in Android Bluetooth settings if using a live car.
+4. Turn **off** simulator in Settings to connect live.
+5. Use the **HUD** / **NAVIGATION** tabs freely. Default tab is configurable in Settings.
+6. Android Auto: open WRX Race HUD from the AA launcher for gauges; use Google Maps AA for routing.
 
 ## Vehicle notes
 

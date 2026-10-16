@@ -11,55 +11,63 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.wrxhud.hud.HudColors
-import com.wrxhud.hud.HudScreen
 import com.wrxhud.hud.HudViewModel
-import com.wrxhud.settings.SettingsScreen
+import com.wrxhud.onboarding.OnboardingWizard
+import com.wrxhud.ui.AppShell
 
 class MainActivity : ComponentActivity() {
     private val viewModel: HudViewModel by viewModels()
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { /* GPS / BT callbacks handled by providers */ }
+    ) {
+        // After grants, start runtime using current preferences.
+        val prefs = viewModel.uiState.value.preferences
+        viewModel.startRuntimeIfNeeded(prefs.copy(onboardingComplete = true))
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         hideSystemUi()
-        requestNeededPermissions()
 
         setContent {
             val ui by viewModel.uiState.collectAsState()
-            var showSettings by remember { mutableStateOf(false) }
+
+            LaunchedEffect(ui.preferences.onboardingComplete) {
+                if (ui.preferences.onboardingComplete) {
+                    viewModel.startRuntimeIfNeeded(ui.preferences)
+                }
+            }
 
             Surface(
                 modifier = Modifier.fillMaxSize(),
                 color = HudColors.Background
             ) {
-                if (showSettings) {
-                    SettingsScreen(
+                if (!ui.preferences.onboardingComplete) {
+                    OnboardingWizard(
                         preferences = ui.preferences,
-                        onBack = { showSettings = false },
-                        onUpdate = viewModel::updatePreferences
+                        onUpdate = viewModel::updatePreferences,
+                        onRequestPermissions = { requestNeededPermissions() },
+                        onFinished = {
+                            // Runtime starts via LaunchedEffect when onboardingComplete flips,
+                            // and again after the permission dialog returns.
+                        }
                     )
                 } else {
-                    HudScreen(
-                        snapshot = ui.snapshot,
-                        preferences = ui.preferences,
-                        connectionStatus = ui.connectionStatus,
-                        onOpenSettings = { showSettings = true }
+                    AppShell(
+                        ui = ui,
+                        onUpdatePreferences = viewModel::updatePreferences
                     )
                 }
             }
@@ -102,6 +110,10 @@ class MainActivity : ComponentActivity() {
         }
         if (needed.isNotEmpty()) {
             permissionLauncher.launch(needed.toTypedArray())
+        } else {
+            viewModel.startRuntimeIfNeeded(
+                viewModel.uiState.value.preferences.copy(onboardingComplete = true)
+            )
         }
     }
 }

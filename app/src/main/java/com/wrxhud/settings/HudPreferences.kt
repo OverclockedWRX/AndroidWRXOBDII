@@ -1,5 +1,6 @@
 package com.wrxhud.settings
 
+import com.wrxhud.telemetry.AppPage
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -8,6 +9,8 @@ import com.wrxhud.vehicle.TempUnit
 import com.wrxhud.vehicle.WrxProfile
 
 data class HudPreferences(
+    val onboardingComplete: Boolean = false,
+    val defaultPage: AppPage = AppPage.HUD,
     val enabledGauges: Set<GaugeId> = setOf(
         GaugeId.RPM,
         GaugeId.SPEED,
