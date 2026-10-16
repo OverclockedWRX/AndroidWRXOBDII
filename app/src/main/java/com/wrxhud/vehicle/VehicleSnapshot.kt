@@ -15,8 +15,8 @@ data class VehicleSnapshot(
     val gear: Int? = null,
     val coolantC: Float? = null,
     val oilTempC: Float? = null,
-    val oilPressurePsi: Float? = null,
-    val oilPressureLow: Boolean? = null,
+    /** How oil temp was resolved, e.g. "01 5C", "22 0113", or "none". */
+    val oilTempSource: String? = null,
     val intakeAirTempC: Float? = null,
     val boostPsi: Float? = null,
     val batteryVolts: Float? = null,
@@ -32,7 +32,6 @@ data class VehicleSnapshot(
 data class AlarmState(
     val cel: Boolean = false,
     val lowFuel: Boolean = false,
-    val lowOilPressure: Boolean = false,
     val highCoolant: Boolean = false,
     val highOilTemp: Boolean = false,
     val highIat: Boolean = false,
@@ -50,7 +49,6 @@ enum class GaugeId {
     GEAR,
     COOLANT,
     OIL_TEMP,
-    OIL_PRESSURE,
     INTAKE_AIR_TEMP,
     BOOST,
     BATTERY
@@ -59,7 +57,6 @@ enum class GaugeId {
 enum class LampId {
     CEL,
     LOW_FUEL,
-    LOW_OIL_PRESSURE,
     HIGH_COOLANT,
     HIGH_OIL_TEMP,
     HIGH_IAT,

@@ -49,11 +49,12 @@ class ObdPoller(
     private val running = AtomicBoolean(false)
     private var job: Job? = null
 
-    private var supportedPids: Set<Int> = emptySet()
+    private val supportedPids = mutableSetOf<Int>()
     private var mapKpa: Float? = null
     private var baroKpa: Float? = null
-    private var confirmedOilTempDid: Int? = null
-    private var confirmedOilSwitchDid: Int? = null
+    private var oilTempMode22Did: Int? = null
+    private var useMode01OilTemp: Boolean = false
+    private var oilTempSourceLabel: String = "none"
 
     private data class SlowPid(
         val name: String,
@@ -93,38 +94,66 @@ class ObdPoller(
     }
 
     private fun discoverCapabilities() {
-        // Supported PID bitmask 01..20
-        val supportRaw = connection.sendCommand(ObdCommands.mode01(0x00))
-        val supportData = StnParser.parseMode01(supportRaw, 0x00)
-        supportedPids = supportData?.let { StnParser.decodeSupportedPidBitmask(it) }.orEmpty()
-        Log.i(TAG, "Supported PIDs (1-32): $supportedPids")
+        supportedPids.clear()
+        // Bitmasks: 0x00 → PIDs 01-20/32, 0x20 → 21-40, 0x40 → 41-60
+        fun mergeSupport(basePid: Int, offset: Int) {
+            val raw = connection.sendCommand(ObdCommands.mode01(basePid))
+            val data = StnParser.parseMode01(raw, basePid) ?: return
+            StnParser.decodeSupportedPidBitmask(data).forEach { bit ->
+                supportedPids.add(bit + offset)
+            }
+        }
+        mergeSupport(0x00, 0)
+        if (supportedPids.contains(0x20)) mergeSupport(0x20, 0x20)
+        if (supportedPids.contains(0x40)) mergeSupport(0x40, 0x40)
+        Log.i(TAG, "Supported PIDs: $supportedPids")
 
-        // Probe Mode 22 oil temp candidates (header 7E0)
+        discoverOilTemp()
+    }
+
+    /**
+     * Confirm oil temp by trying known sources and accepting the first plausible reading.
+     * Order: SAE 01 5C → Mode 22 candidates under 7E0.
+     */
+    private fun discoverOilTemp() {
+        useMode01OilTemp = false
+        oilTempMode22Did = null
+        oilTempSourceLabel = "none"
+
+        // Prefer standard oil-temp PID when advertised or when a live read works.
+        val tryMode01 = supportedPids.contains(WrxProfile.Pid.OIL_TEMP) || supportedPids.isEmpty()
+        if (tryMode01) {
+            val raw = connection.sendCommand(ObdCommands.mode01(WrxProfile.Pid.OIL_TEMP))
+            val data = StnParser.parseMode01(raw, WrxProfile.Pid.OIL_TEMP)
+            val temp = data?.let { StnParser.decodeTempC(it) }
+            if (temp != null && temp in -20f..160f) {
+                useMode01OilTemp = true
+                oilTempSourceLabel = "01 5C"
+                _snapshot.update { it.copy(oilTempC = temp, oilTempSource = oilTempSourceLabel) }
+                Log.i(TAG, "Oil temp confirmed via Mode 01 PID 5C = $temp C")
+                return
+            }
+        }
+
         connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
         for (candidate in WrxProfile.oilTempCandidates) {
-            if (!candidate.confirmed) continue
             val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
+            Log.i(TAG, "Oil temp probe 22 ${"%04X".format(candidate.did)} -> ${StnParser.normalize(raw)}")
             val data = StnParser.parseMode22(raw, candidate.did) ?: continue
             val value = candidate.scale(data) ?: continue
-            if (candidate.plausible(value)) {
-                confirmedOilTempDid = candidate.did
-                Log.i(TAG, "Confirmed oil temp DID 0x${"%04X".format(candidate.did)}")
-                break
-            }
+            if (!candidate.plausible(value)) continue
+            oilTempMode22Did = candidate.did
+            oilTempSourceLabel = "22 ${"%04X".format(candidate.did)}"
+            _snapshot.update { it.copy(oilTempC = value, oilTempSource = oilTempSourceLabel) }
+            Log.i(TAG, "Oil temp confirmed via $oilTempSourceLabel = $value C")
+            break
         }
-        for (candidate in WrxProfile.oilPressureSwitchCandidates) {
-            if (!candidate.confirmed) continue
-            val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
-            val data = StnParser.parseMode22(raw, candidate.did) ?: continue
-            val value = candidate.scale(data) ?: continue
-            if (candidate.plausible(value)) {
-                confirmedOilSwitchDid = candidate.did
-                Log.i(TAG, "Confirmed oil switch DID 0x${"%04X".format(candidate.did)}")
-                break
-            }
-        }
-        // Restore default broadcast header for mode 01
         connection.sendCommand("ATSH7DF")
+
+        if (oilTempMode22Did == null && !useMode01OilTemp) {
+            Log.w(TAG, "Oil temp: no DID confirmed (ECU did not return a plausible value)")
+            _snapshot.update { it.copy(oilTempSource = "none") }
+        }
     }
 
     private fun buildSlowQueue(): List<SlowPid> {
@@ -159,24 +188,31 @@ class ObdPoller(
                 _snapshot.update { it.copy(fuelLevelPercent = StnParser.decodePercent(data)) }
             } }
         }
-        confirmedOilTempDid?.let { did ->
-            list += SlowPid("oilTemp") { pollMode22(did) { data ->
-                val candidate = WrxProfile.oilTempCandidates.first { it.did == did }
-                val value = candidate.scale(data)
-                if (value != null && candidate.plausible(value)) {
-                    _snapshot.update { it.copy(oilTempC = value) }
+        if (useMode01OilTemp) {
+            list += SlowPid("oilTemp") {
+                pollMode01(WrxProfile.Pid.OIL_TEMP) { data ->
+                    val temp = StnParser.decodeTempC(data)
+                    if (temp != null && temp in -20f..160f) {
+                        _snapshot.update {
+                            it.copy(oilTempC = temp, oilTempSource = oilTempSourceLabel)
+                        }
+                    }
                 }
-            } }
-        }
-        confirmedOilSwitchDid?.let { did ->
-            list += SlowPid("oilSwitch") { pollMode22(did) { data ->
-                val candidate = WrxProfile.oilPressureSwitchCandidates.first { it.did == did }
-                val value = candidate.scale(data)
-                if (value != null && candidate.plausible(value)) {
-                    // 1 = switch closed / pressure OK on many Subarus; treat 0 as low.
-                    _snapshot.update { it.copy(oilPressureLow = value == 0f, oilPressurePsi = null) }
+            }
+        } else {
+            oilTempMode22Did?.let { did ->
+                list += SlowPid("oilTemp") {
+                    pollMode22(did) { data ->
+                        val candidate = WrxProfile.oilTempCandidates.first { it.did == did }
+                        val value = candidate.scale(data)
+                        if (value != null && candidate.plausible(value)) {
+                            _snapshot.update {
+                                it.copy(oilTempC = value, oilTempSource = oilTempSourceLabel)
+                            }
+                        }
+                    }
                 }
-            } }
+            }
         }
         return list
     }

@@ -114,21 +114,6 @@ fun HudScreen(
                         modifier = Modifier.weight(1f)
                     )
                 }
-                if (GaugeId.OIL_PRESSURE in preferences.enabledGauges) {
-                    GaugeTile(
-                        label = "OIL PRES",
-                        valueText = UnitConverters.formatPressure(snapshot.oilPressurePsi, preferences.pressureUnit),
-                        unit = preferences.pressureUnit.name,
-                        severity = if (snapshot.oilPressureLow == true) {
-                            AlarmEvaluator.Severity.CRITICAL
-                        } else if (snapshot.oilPressurePsi == null) {
-                            AlarmEvaluator.Severity.NONE
-                        } else {
-                            AlarmEvaluator.Severity.NORMAL
-                        },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
                 if (GaugeId.INTAKE_AIR_TEMP in preferences.enabledGauges) {
                     GaugeTile(
                         label = "IAT",
@@ -180,7 +165,11 @@ fun HudScreen(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
-                text = connectionStatus + if (snapshot.usingSimulator) "  [SIM]" else "",
+                text = buildString {
+                    append(connectionStatus)
+                    if (snapshot.usingSimulator) append("  [SIM]")
+                    snapshot.oilTempSource?.let { append("  OIL:$it") }
+                },
                 color = HudColors.TextDim,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace

@@ -3,8 +3,8 @@ package com.wrxhud.vehicle
 /**
  * 2022–present Subaru WRX (VB / FA24) vehicle profile.
  *
- * Mode 22 DIDs are candidates only. [Mode22Candidate.confirmed] stays false until an
- * in-car session validates the DID and scale; unconfirmed entries never drive a number.
+ * Oil temp: try SAE Mode 01 PID 0x5C first, then Mode 22 candidates under header 7E0.
+ * A candidate is accepted for the session when the ECU returns a plausible temperature.
  */
 object WrxProfile {
     const val MODEL_YEARS = "2022–present"
@@ -58,33 +58,29 @@ object WrxProfile {
         val did: Int,
         val label: String,
         val scale: (ByteArray) -> Float?,
-        val plausible: (Float) -> Boolean,
-        val confirmed: Boolean = false
+        val plausible: (Float) -> Boolean
     )
 
-    /** Candidate oil-temp DIDs. None confirmed on VB yet. */
+    /**
+     * Mode 22 oil-temp candidates (header 7E0). Probed at connect if Mode 01 0x5C fails.
+     * 0x0113 is a common Subaru oil-temp DID (A-40); 0x1153 is a secondary probe.
+     */
     val oilTempCandidates: List<Mode22Candidate> = listOf(
         Mode22Candidate(
-            did = 0x1153,
-            label = "Oil temp candidate 0x1153",
+            did = 0x0113,
+            label = "Oil temp Mode22 0x0113",
             scale = { bytes ->
                 if (bytes.isNotEmpty()) (bytes[0].toInt() and 0xFF) - 40f else null
             },
-            plausible = { it in -20f..160f },
-            confirmed = false
-        )
-    )
-
-    val oilPressureSwitchCandidates: List<Mode22Candidate> = listOf(
+            plausible = { it in -20f..160f }
+        ),
         Mode22Candidate(
-            did = 0x1154,
-            label = "Oil pressure switch candidate 0x1154",
+            did = 0x1153,
+            label = "Oil temp Mode22 0x1153",
             scale = { bytes ->
-                if (bytes.isEmpty()) null
-                else (bytes[0].toInt() and 0x01).toFloat()
+                if (bytes.isNotEmpty()) (bytes[0].toInt() and 0xFF) - 40f else null
             },
-            plausible = { it == 0f || it == 1f },
-            confirmed = false
+            plausible = { it in -20f..160f }
         )
     )
 
@@ -101,6 +97,8 @@ object WrxProfile {
         const val FUEL_LEVEL = 0x2F
         const val BARO = 0x33
         const val CONTROL_MODULE_VOLTAGE = 0x42
+        /** SAE engine oil temperature (°C = A - 40). */
+        const val OIL_TEMP = 0x5C
     }
 
     data class AlarmThresholds(

@@ -26,7 +26,6 @@ fun WarningLamps(
     val lamps = buildList {
         if (LampId.CEL in enabled) add("CEL" to alarms.cel)
         if (LampId.LOW_FUEL in enabled) add("FUEL" to alarms.lowFuel)
-        if (LampId.LOW_OIL_PRESSURE in enabled) add("OIL P" to alarms.lowOilPressure)
         if (LampId.HIGH_COOLANT in enabled) add("HOT" to alarms.highCoolant)
         if (LampId.HIGH_OIL_TEMP in enabled) add("OIL T" to alarms.highOilTemp)
         if (LampId.HIGH_IAT in enabled) add("IAT" to alarms.highIat)

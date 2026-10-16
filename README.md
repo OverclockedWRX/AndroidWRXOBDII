@@ -7,8 +7,8 @@ Android 15+ race HUD for **2022–present Subaru WRX (VB / FA24)** using an **OB
 - AiM-style shift lights and bar tachometer with frame-timed RPM interpolation
 - GPS speed display (phone GPS)
 - Calculated gear (6MT or SPT/CVT ratios + tire size)
-- Toggleable gauges: coolant, oil temp, oil pressure, IAT, boost, battery
-- Warning lamps: CEL, low fuel, oil pressure, temps, overboost, battery, OBD/GPS link, knock/DAM (when Mode 22 DIDs are confirmed)
+- Toggleable gauges: coolant, oil temp, IAT, boost, battery
+- Warning lamps: CEL, low fuel, temps, overboost, battery, OBD/GPS link, knock/DAM (when Mode 22 DIDs are confirmed)
 - Simulator mode for UI development without a car
 - Settings stored in DataStore
 
@@ -43,8 +43,23 @@ Install the APK from `app/build/outputs/apk/debug/`.
 | RPM, coolant, IAT, MAP/boost, voltage, MIL, fuel % | SAE Mode 01 |
 | Speed (display) | Phone GPS |
 | Gear | Calculated from OBD speed + RPM + WRX ratios |
-| Oil temp / oil pressure | Mode 22 candidates — shown only after DID confirmation |
+| Oil temp | Auto-probed: Mode 01 `5C`, then Mode 22 `0113` / `1153` (header `7E0`) |
+| Oil pressure | Not available (VB has a switch only, no PSI sensor on OBD) |
 | Coolant vs “water temp” | Same ECT sensor on FA24 (one Coolant tile) |
+
+## Confirming oil-temp DIDs
+
+On connect the app tries each oil-temp source and keeps the first reply that decodes to a plausible temperature (−20…160 °C). The footer shows `OIL:01 5C`, `OIL:22 0113`, or `OIL:none`.
+
+To confirm manually with an MX+ terminal (or Torque custom PID test):
+
+1. Pair the adapter, ignition ON / engine running.
+2. Init: `ATZ`, `ATE0`, `ATH0`, `ATSP6`, `ATSH7E0`.
+3. Try `015C` — expect `41 5C XX` → temp = XX − 40 °C.
+4. If that fails, try `220113` then `221153` — expect `62 …` with data byte(s); scale is typically A−40 °C.
+5. Cross-check against a known-good oil temp (Accessport / another gauge). If the live value tracks within a few degrees, that DID is confirmed — tell us and we hard-code it as the primary.
+
+`adb logcat -s ObdPoller` also prints each probe reply during connect.
 
 ## License
 

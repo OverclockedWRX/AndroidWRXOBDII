@@ -9,7 +9,6 @@ object AlarmEvaluator {
         return AlarmState(
             cel = snapshot.milOn == true,
             lowFuel = snapshot.fuelLevelPercent?.let { it <= thresholds.lowFuelPercent } == true,
-            lowOilPressure = snapshot.oilPressureLow == true,
             highCoolant = snapshot.coolantC?.let { it >= thresholds.coolantAmberC } == true,
             highOilTemp = snapshot.oilTempC?.let { it >= thresholds.oilTempAmberC } == true,
             highIat = snapshot.intakeAirTempC?.let { it >= thresholds.iatAmberC } == true,

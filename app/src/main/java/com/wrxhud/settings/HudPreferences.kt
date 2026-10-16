@@ -14,7 +14,6 @@ data class HudPreferences(
         GaugeId.GEAR,
         GaugeId.COOLANT,
         GaugeId.OIL_TEMP,
-        GaugeId.OIL_PRESSURE,
         GaugeId.INTAKE_AIR_TEMP,
         GaugeId.BOOST,
         GaugeId.BATTERY
@@ -22,7 +21,6 @@ data class HudPreferences(
     val enabledLamps: Set<LampId> = setOf(
         LampId.CEL,
         LampId.LOW_FUEL,
-        LampId.LOW_OIL_PRESSURE,
         LampId.HIGH_COOLANT,
         LampId.HIGH_OIL_TEMP,
         LampId.HIGH_IAT,
