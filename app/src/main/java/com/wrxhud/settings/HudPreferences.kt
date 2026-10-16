@@ -1,5 +1,6 @@
 package com.wrxhud.settings
 
+import com.wrxhud.gps.GpsSourceMode
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -59,10 +60,16 @@ data class HudPreferences(
     val tireWidthMm: Int = WrxProfile.DEFAULT_TIRE_WIDTH_MM,
     val tireAspect: Int = WrxProfile.DEFAULT_TIRE_ASPECT,
     val wheelDiameterIn: Int = WrxProfile.DEFAULT_WHEEL_DIAMETER_IN,
-    val useSimulator: Boolean = true,
+    val useSimulator: Boolean = false,
     val pinkyMode: Boolean = false,
     /** Fast & Furious redline Easter egg overlay after the 2nd+ redline hit this session. */
     val dangerToManifold: Boolean = false,
+    /** Extruded / beveled 3D look for the RPM bar tach. */
+    val rpmGauge3d: Boolean = false,
+    /** Built-in / Bluetooth / USB / Auto GPS source selection. */
+    val gpsSourceMode: GpsSourceMode = GpsSourceMode.AUTO,
+    /** Optional bonded BT GPS MAC; empty = auto-pick by device name. */
+    val bluetoothGpsAddress: String = "",
     val coolantAmberC: Float = 105f,
     val coolantRedC: Float = 115f,
     val oilTempAmberC: Float = 120f,

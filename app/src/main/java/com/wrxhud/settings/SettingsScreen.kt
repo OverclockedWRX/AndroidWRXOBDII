@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import com.wrxhud.gps.GpsSourceMode
 import com.wrxhud.hud.HudColors
 import com.wrxhud.hud.HudThemeController
 import com.wrxhud.vehicle.GaugeId
@@ -114,6 +115,33 @@ fun SettingsScreen(
                 )
             }
 
+            SectionTitle("GPS source")
+            Text(
+                text = "Auto uses built-in GNSS when present, and falls back to Bluetooth / USB NMEA dongles (pair BT GPS in Android settings first).",
+                color = HudColors.TextDim,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 15.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GpsSourceMode.entries.take(2).forEach { mode ->
+                    FilterChip(
+                        selected = preferences.gpsSourceMode == mode,
+                        onClick = { onUpdate { it.copy(gpsSourceMode = mode) } },
+                        label = { Text(mode.label) }
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                GpsSourceMode.entries.drop(2).forEach { mode ->
+                    FilterChip(
+                        selected = preferences.gpsSourceMode == mode,
+                        onClick = { onUpdate { it.copy(gpsSourceMode = mode) } },
+                        label = { Text(mode.label) }
+                    )
+                }
+            }
+
             SectionTitle("Appearance")
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -166,6 +194,31 @@ fun SettingsScreen(
                 Switch(
                     checked = preferences.dangerToManifold,
                     onCheckedChange = { checked -> onUpdate { it.copy(dangerToManifold = checked) } }
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                    Text(
+                        "3D RPM gauge",
+                        color = if (preferences.rpmGauge3d) HudColors.Accent else HudColors.TextPrimary,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        "Extruded bar tach with depth, bevel, and specular edge",
+                        color = HudColors.TextDim,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                Switch(
+                    checked = preferences.rpmGauge3d,
+                    onCheckedChange = { checked -> onUpdate { it.copy(rpmGauge3d = checked) } }
                 )
             }
 

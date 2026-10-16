@@ -10,25 +10,60 @@ import android.location.LocationManager
 import android.os.Bundle
 import android.os.Looper
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
+enum class GpsSourceKind {
+    NONE,
+    BUILTIN,
+    BLUETOOTH,
+    USB
+}
+
+enum class GpsSourceMode {
+    AUTO,
+    BUILTIN,
+    BLUETOOTH,
+    USB;
+
+    val label: String
+        get() = when (this) {
+            AUTO -> "Auto"
+            BUILTIN -> "Built-in"
+            BLUETOOTH -> "Bluetooth dongle"
+            USB -> "USB dongle"
+        }
+}
+
 data class GpsReading(
     val speedMps: Float? = null,
     val hasFix: Boolean = false,
-    val accuracyM: Float? = null
+    val accuracyM: Float? = null,
+    val source: GpsSourceKind = GpsSourceKind.NONE
 )
 
 /**
- * Phone GPS speed via LocationManager (no Play Services).
+ * Aggregates built-in LocationManager GPS plus Bluetooth / USB NMEA dongles.
  */
 class GpsSpeedProvider(private val context: Context) : LocationListener {
     private val locationManager =
         context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val bluetoothGps = BluetoothNmeaGps(context, scope) { publishExternal(it) }
+    private val usbGps = UsbNmeaGps(context, scope) { publishExternal(it) }
+
     private val _reading = MutableStateFlow(GpsReading())
     val reading: StateFlow<GpsReading> = _reading.asStateFlow()
+
+    private var mode: GpsSourceMode = GpsSourceMode.AUTO
+    private var bluetoothAddress: String? = null
+    private var builtinActive = false
 
     fun hasPermission(): Boolean {
         return ContextCompat.checkSelfPermission(
@@ -37,10 +72,57 @@ class GpsSpeedProvider(private val context: Context) : LocationListener {
         ) == PackageManager.PERMISSION_GRANTED
     }
 
+    fun hasBuiltInGpsHardware(): Boolean {
+        val pm = context.packageManager
+        if (!pm.hasSystemFeature(PackageManager.FEATURE_LOCATION_GPS)) return false
+        return runCatching {
+            locationManager.allProviders.contains(LocationManager.GPS_PROVIDER)
+        }.getOrDefault(false)
+    }
+
+    fun start(
+        mode: GpsSourceMode = GpsSourceMode.AUTO,
+        bluetoothAddress: String? = null
+    ) {
+        this.mode = mode
+        this.bluetoothAddress = bluetoothAddress
+        stopSources()
+        _reading.value = GpsReading()
+
+        when (mode) {
+            GpsSourceMode.BUILTIN -> startBuiltin()
+            GpsSourceMode.BLUETOOTH -> bluetoothGps.start(bluetoothAddress)
+            GpsSourceMode.USB -> usbGps.start()
+            GpsSourceMode.AUTO -> {
+                if (hasBuiltInGpsHardware()) {
+                    startBuiltin()
+                }
+                // Always arm external sources as fallback for tablets / AAUs without GNSS.
+                bluetoothGps.start(bluetoothAddress)
+                usbGps.start()
+            }
+        }
+    }
+
+    fun stop() {
+        stopSources()
+    }
+
+    fun destroy() {
+        stopSources()
+        scope.cancel()
+    }
+
+    private fun stopSources() {
+        stopBuiltin()
+        bluetoothGps.stop()
+        usbGps.stop()
+    }
+
     @SuppressLint("MissingPermission")
-    fun start() {
+    private fun startBuiltin() {
         if (!hasPermission()) {
-            _reading.value = GpsReading(hasFix = false)
+            _reading.value = GpsReading(source = GpsSourceKind.BUILTIN)
             return
         }
         val providers = listOf(
@@ -57,24 +139,49 @@ class GpsSpeedProvider(private val context: Context) : LocationListener {
                 Looper.getMainLooper()
             )
         }
+        builtinActive = providers.isNotEmpty()
         providers.firstOrNull()?.let { provider ->
             locationManager.getLastKnownLocation(provider)?.let { onLocationChanged(it) }
         }
     }
 
-    fun stop() {
-        runCatching { locationManager.removeUpdates(this) }
+    private fun stopBuiltin() {
+        if (builtinActive) {
+            runCatching { locationManager.removeUpdates(this) }
+            builtinActive = false
+        }
+    }
+
+    private fun publishExternal(reading: GpsReading) {
+        val current = _reading.value
+        // Prefer a live built-in fix when present; otherwise take external NMEA.
+        val builtinHasLiveFix =
+            current.source == GpsSourceKind.BUILTIN && current.hasFix && current.speedMps != null
+        if (builtinHasLiveFix && mode == GpsSourceMode.AUTO) return
+        if (reading.speedMps != null || reading.hasFix) {
+            _reading.value = reading
+        } else if (current.source == GpsSourceKind.NONE || current.source == reading.source) {
+            _reading.value = reading
+        }
     }
 
     override fun onLocationChanged(location: Location) {
         val hasSpeed = location.hasSpeed()
         val speed = if (hasSpeed) location.speed else null
         val accurate = !location.hasAccuracy() || location.accuracy <= 30f
-        _reading.value = GpsReading(
+        val reading = GpsReading(
             speedMps = speed,
             hasFix = accurate && (speed != null || location.accuracy <= 20f),
-            accuracyM = if (location.hasAccuracy()) location.accuracy else null
+            accuracyM = if (location.hasAccuracy()) location.accuracy else null,
+            source = GpsSourceKind.BUILTIN
         )
+        if (mode == GpsSourceMode.BUILTIN || mode == GpsSourceMode.AUTO) {
+            if (reading.hasFix || _reading.value.source == GpsSourceKind.BUILTIN ||
+                _reading.value.source == GpsSourceKind.NONE
+            ) {
+                _reading.value = reading
+            }
+        }
     }
 
     @Deprecated("Deprecated in API")
@@ -83,6 +190,8 @@ class GpsSpeedProvider(private val context: Context) : LocationListener {
     override fun onProviderEnabled(provider: String) = Unit
 
     override fun onProviderDisabled(provider: String) {
-        _reading.value = _reading.value.copy(hasFix = false)
+        if (_reading.value.source == GpsSourceKind.BUILTIN) {
+            _reading.value = _reading.value.copy(hasFix = false)
+        }
     }
 }

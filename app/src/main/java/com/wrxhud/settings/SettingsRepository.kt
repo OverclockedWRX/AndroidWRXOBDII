@@ -10,6 +10,7 @@ import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.wrxhud.gps.GpsSourceMode
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -38,6 +39,9 @@ class SettingsRepository(private val context: Context) {
         val useSim = booleanPreferencesKey("use_sim")
         val pinkyMode = booleanPreferencesKey("pinky_mode")
         val dangerToManifold = booleanPreferencesKey("danger_to_manifold")
+        val rpmGauge3d = booleanPreferencesKey("rpm_gauge_3d")
+        val gpsSourceMode = stringPreferencesKey("gps_source_mode")
+        val bluetoothGpsAddress = stringPreferencesKey("bluetooth_gps_address")
         val coolantAmber = floatPreferencesKey("coolant_amber")
         val coolantRed = floatPreferencesKey("coolant_red")
         val oilAmber = floatPreferencesKey("oil_amber")
@@ -71,6 +75,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.useSim] = next.useSimulator
             prefs[Keys.pinkyMode] = next.pinkyMode
             prefs[Keys.dangerToManifold] = next.dangerToManifold
+            prefs[Keys.rpmGauge3d] = next.rpmGauge3d
+            prefs[Keys.gpsSourceMode] = next.gpsSourceMode.name
+            prefs[Keys.bluetoothGpsAddress] = next.bluetoothGpsAddress
             prefs[Keys.coolantAmber] = next.coolantAmberC
             prefs[Keys.coolantRed] = next.coolantRedC
             prefs[Keys.oilAmber] = next.oilTempAmberC
@@ -119,6 +126,11 @@ class SettingsRepository(private val context: Context) {
             useSimulator = this[Keys.useSim] ?: defaults.useSimulator,
             pinkyMode = this[Keys.pinkyMode] ?: defaults.pinkyMode,
             dangerToManifold = this[Keys.dangerToManifold] ?: defaults.dangerToManifold,
+            rpmGauge3d = this[Keys.rpmGauge3d] ?: defaults.rpmGauge3d,
+            gpsSourceMode = this[Keys.gpsSourceMode]
+                ?.let { runCatching { GpsSourceMode.valueOf(it) }.getOrNull() }
+                ?: defaults.gpsSourceMode,
+            bluetoothGpsAddress = this[Keys.bluetoothGpsAddress] ?: defaults.bluetoothGpsAddress,
             coolantAmberC = this[Keys.coolantAmber] ?: defaults.coolantAmberC,
             coolantRedC = this[Keys.coolantRed] ?: defaults.coolantRedC,
             oilTempAmberC = this[Keys.oilAmber] ?: defaults.oilTempAmberC,

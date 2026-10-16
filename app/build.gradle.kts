@@ -12,8 +12,8 @@ android {
         applicationId = "com.wrxhud"
         minSdk = 35
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.6.0"
+        versionCode = 7
+        versionName = "0.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -68,6 +68,9 @@ dependencies {
     // Android Auto (template instrument HUD)
     implementation("androidx.car.app:app:1.4.0")
     implementation("androidx.car.app:app-projected:1.4.0")
+
+    // USB serial GPS dongles (FTDI / CP210x / CH340 / CDC ACM / etc.)
+    implementation("com.github.mik3y:usb-serial-for-android:3.8.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

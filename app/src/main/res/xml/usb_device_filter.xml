@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Broad USB-serial GPS class matches; permission dialog still required per device. -->
+    <usb-device class="255" subclass="255" protocol="255" />
+    <usb-device class="2" subclass="2" protocol="1" />
+</resources>

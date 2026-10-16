@@ -7,7 +7,7 @@ Android 15+ race instrument / HUD for **2022–present Subaru WRX (VB / FA24)** 
 - First-run setup wizard (permissions requested only on the last step)
 - Full-screen instrument display (phone + Android Auto template HUD)
 - AiM-style shift lights and bar tachometer with frame-timed RPM interpolation
-- GPS speed display (phone GPS)
+- GPS speed: built-in GNSS, Bluetooth NMEA dongle, or USB serial GPS (Auto / forced in Settings)
 - Calculated gear (6MT or SPT/CVT ratios + tire size)
 - Toggleable gauges: coolant, oil temp, IAT, boost/vacuum, battery
 - Zone-colored tach bar (green → amber → red toward redline)

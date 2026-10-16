@@ -27,7 +27,28 @@ data class VehicleSnapshot(
     val obdConnected: Boolean = false,
     val usingSimulator: Boolean = false,
     val alarms: AlarmState = AlarmState()
-)
+) {
+    /**
+     * Keeps only phone GPS fields; clears all OBD / simulator telemetry.
+     */
+    fun phoneOnly(
+        gpsSpeedMps: Float? = this.gpsSpeedMps,
+        gpsHasFix: Boolean = this.gpsHasFix,
+        thresholds: WrxProfile.AlarmThresholds = WrxProfile.AlarmThresholds(),
+        expectObd: Boolean = true
+    ): VehicleSnapshot {
+        val cleared = VehicleSnapshot(
+            timestampMs = System.currentTimeMillis(),
+            gpsSpeedMps = gpsSpeedMps,
+            gpsHasFix = gpsHasFix,
+            obdConnected = false,
+            usingSimulator = false
+        )
+        return cleared.copy(
+            alarms = AlarmEvaluator.evaluate(cleared, thresholds, expectObd = expectObd)
+        )
+    }
+}
 
 data class AlarmState(
     val cel: Boolean = false,

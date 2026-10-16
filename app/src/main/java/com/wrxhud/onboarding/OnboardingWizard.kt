@@ -264,7 +264,7 @@ private fun PermissionsPage() {
     Text(
         text = "The next step asks Android for:\n\n" +
             "• Nearby devices / Bluetooth — talk to the OBDLink MX+\n" +
-            "• Location — GPS speed display\n" +
+            "• Location — GPS speed (built-in, Bluetooth, or USB dongle)\n" +
             "• Notifications — keep the OBD service alive\n\n" +
             "Tap “Grant access & start” to continue.",
         color = HudColors.TextPrimary,

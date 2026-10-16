@@ -44,16 +44,10 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             service = local.getService()
             bound = true
             viewModelScope.launch {
-                service?.snapshot?.collect {
-                    _serviceSnapshot.value = it
-                    TelemetryHub.publishSnapshot(mergeGps(it))
-                }
+                service?.snapshot?.collect { _serviceSnapshot.value = it }
             }
             viewModelScope.launch {
-                service?.status?.collect {
-                    _status.value = it
-                    TelemetryHub.publishStatus(it)
-                }
+                service?.status?.collect { _status.value = it }
             }
         }
 
@@ -70,44 +64,86 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         gps.reading,
         _runtimeStarted
     ) { snap, prefs, status, gpsReading, runtimeStarted ->
-        val merged = snap.copy(
-            gpsSpeedMps = gpsReading.speedMps ?: snap.gpsSpeedMps,
-            gpsHasFix = gpsReading.hasFix || snap.gpsHasFix
-        )
-        TelemetryHub.publishSnapshot(merged)
+        val gpsSpeed = gpsReading.speedMps
+        val gpsFix = gpsReading.hasFix
+
+        // Simulator only when enabled; live OBD only when connected.
+        // Otherwise gauges freeze except phone GPS speed / fix.
+        val hasObdStream = when {
+            prefs.useSimulator -> snap.usingSimulator
+            else -> snap.obdConnected && !snap.usingSimulator
+        }
+
+        val displaySnap = if (hasObdStream) {
+            snap.copy(
+                gpsSpeedMps = gpsSpeed ?: snap.gpsSpeedMps,
+                gpsHasFix = gpsFix,
+                usingSimulator = prefs.useSimulator && snap.usingSimulator
+            )
+        } else {
+            snap.phoneOnly(
+                gpsSpeedMps = gpsSpeed,
+                gpsHasFix = gpsFix,
+                thresholds = prefs.toAlarmThresholds(),
+                expectObd = !prefs.useSimulator
+            )
+        }
+
+        val displayStatus = when {
+            prefs.useSimulator && snap.usingSimulator -> status
+            prefs.useSimulator -> "Starting simulator…"
+            snap.obdConnected -> status
+            status.isNotBlank() && status != "Stopped" && status != "Idle" -> status
+            else -> "No OBD — GPS only"
+        }
+
+        TelemetryHub.publishSnapshot(displaySnap)
         TelemetryHub.publishPreferences(prefs)
-        TelemetryHub.publishStatus(status)
+        TelemetryHub.publishStatus(displayStatus)
+
         HudUiState(
-            snapshot = merged,
+            snapshot = displaySnap,
             preferences = prefs,
-            connectionStatus = status,
+            connectionStatus = displayStatus,
             runtimeStarted = runtimeStarted
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HudUiState())
 
     private var lastSimulatorSetting: Boolean? = null
+    private var lastGpsMode: com.wrxhud.gps.GpsSourceMode? = null
+    private var lastBluetoothGpsAddress: String? = null
+
+    init {
+        viewModelScope.launch {
+            settingsRepository.preferencesFlow.collect { prefs ->
+                if (prefs.onboardingComplete) {
+                    startRuntimeIfNeeded(prefs)
+                }
+            }
+        }
+    }
 
     /**
-     * Starts GPS + OBD only after onboarding finishes and permissions are requested.
+     * Starts GPS + OBD/simulator only after onboarding finishes.
+     * Simulator runs exclusively when [HudPreferences.useSimulator] is true.
      */
     fun startRuntimeIfNeeded(preferences: HudPreferences) {
         if (!preferences.onboardingComplete) return
-        if (!_runtimeStarted.value) {
-            gps.start()
+        val gpsChanged = lastGpsMode != preferences.gpsSourceMode ||
+            lastBluetoothGpsAddress != preferences.bluetoothGpsAddress
+        if (!_runtimeStarted.value || gpsChanged) {
+            lastGpsMode = preferences.gpsSourceMode
+            lastBluetoothGpsAddress = preferences.bluetoothGpsAddress
+            gps.start(
+                mode = preferences.gpsSourceMode,
+                bluetoothAddress = preferences.bluetoothGpsAddress.ifBlank { null }
+            )
             _runtimeStarted.value = true
         }
         if (lastSimulatorSetting != preferences.useSimulator) {
             lastSimulatorSetting = preferences.useSimulator
-            startObd(preferences.useSimulator)
+            startObd(useSimulator = preferences.useSimulator)
         }
-    }
-
-    private fun mergeGps(snap: VehicleSnapshot): VehicleSnapshot {
-        val reading = gps.reading.value
-        return snap.copy(
-            gpsSpeedMps = reading.speedMps ?: snap.gpsSpeedMps,
-            gpsHasFix = reading.hasFix || snap.gpsHasFix
-        )
     }
 
     fun startObd(useSimulator: Boolean) {
@@ -120,6 +156,10 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         if (!bound) {
             app.bindService(intent, connection, Context.BIND_AUTO_CREATE)
         }
+        // Clear immediately so a disabled sim cannot leave stale gauge values on screen.
+        if (!useSimulator) {
+            _serviceSnapshot.value = VehicleSnapshot()
+        }
     }
 
     fun stopObd() {
@@ -128,6 +168,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             action = ObdService.ACTION_STOP
         }
         app.startService(intent)
+        _serviceSnapshot.value = VehicleSnapshot()
     }
 
     fun updatePreferences(transform: (HudPreferences) -> HudPreferences) {
@@ -137,7 +178,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        gps.stop()
+        gps.destroy()
         if (bound) {
             getApplication<Application>().unbindService(connection)
             bound = false

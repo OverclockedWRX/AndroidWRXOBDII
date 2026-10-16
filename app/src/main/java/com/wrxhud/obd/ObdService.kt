@@ -17,6 +17,7 @@ import androidx.core.app.ServiceCompat
 import com.wrxhud.MainActivity
 import com.wrxhud.R
 import com.wrxhud.settings.SettingsRepository
+import com.wrxhud.vehicle.AlarmEvaluator
 import com.wrxhud.vehicle.VehicleSnapshot
 import com.wrxhud.vehicle.WrxProfile
 import kotlinx.coroutines.CoroutineScope
@@ -50,6 +51,7 @@ class ObdService : Service() {
     private var connection: ObdConnection? = null
     private var poller: ObdPoller? = null
     private var simJob: kotlinx.coroutines.Job? = null
+    private var liveJob: kotlinx.coroutines.Job? = null
 
     private val _snapshot = MutableStateFlow(VehicleSnapshot())
     val snapshot: StateFlow<VehicleSnapshot> = _snapshot.asStateFlow()
@@ -68,20 +70,24 @@ class ObdService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
-                stopSession()
+                stopSession(publishIdle = true)
                 stopSelf()
             }
             ACTION_START, null -> {
                 val useSim = intent?.getBooleanExtra(EXTRA_USE_SIMULATOR, false) == true
                 startForegroundNotification()
-                if (useSim) startSimulator() else startLive()
+                if (useSim) {
+                    startSimulator()
+                } else {
+                    startLive()
+                }
             }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        stopSession()
+        stopSession(publishIdle = false)
         scope.cancel()
         super.onDestroy()
     }
@@ -109,46 +115,66 @@ class ObdService : Service() {
     }
 
     private fun startSimulator() {
-        stopSession()
+        stopSession(publishIdle = false)
         _status.value = "Simulator"
         simJob = scope.launch {
-            SimulatedObdSource().snapshots().collect { frame ->
+            // Re-check preference so a stale START cannot keep sim running after disable.
+            val prefs = settingsRepository.preferencesFlow.first()
+            if (!prefs.useSimulator) {
+                _status.value = "Simulator disabled"
+                publishPhoneOnlyIdle()
+                return@launch
+            }
+            SimulatedObdSource(thresholds = prefs.toAlarmThresholds()).snapshots().collect { frame ->
                 _snapshot.value = frame
             }
         }
     }
 
     private fun startLive() {
-        stopSession()
-        scope.launch {
+        stopSession(publishIdle = false)
+        liveJob = scope.launch {
+            // Never fall back to simulator when live mode is requested.
+            val prefsAtStart = settingsRepository.preferencesFlow.first()
+            if (prefsAtStart.useSimulator) {
+                startSimulator()
+                return@launch
+            }
+            publishPhoneOnlyIdle()
             try {
                 _status.value = "Connecting…"
                 val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
                 val adapter = bluetoothManager.adapter
                     ?: run {
                         _status.value = "Bluetooth unavailable"
+                        publishPhoneOnlyIdle()
                         return@launch
                     }
                 if (!adapter.isEnabled) {
                     _status.value = "Bluetooth disabled"
+                    publishPhoneOnlyIdle()
                     return@launch
                 }
                 val conn = ObdConnection(adapter)
                 connection = conn
                 val device = conn.findMxPlus()
                     ?: run {
-                        _status.value = "Pair OBDLink MX+ in Android settings"
+                        _status.value = "No OBDLink MX+ — GPS only"
+                        publishPhoneOnlyIdle()
                         return@launch
                     }
                 conn.connect(device)
                 _status.value = "Connected: ${device.name}"
 
-                val prefs = settingsRepository.preferencesFlow.first()
+                var latestPrefs = settingsRepository.preferencesFlow.first()
+                val prefsWatcher = launch {
+                    settingsRepository.preferencesFlow.collect { latestPrefs = it }
+                }
                 val pollerInstance = ObdPoller(
                     connection = conn,
                     scope = scope,
                     gearConfigProvider = {
-                        val p = prefs
+                        val p = latestPrefs
                         ObdPoller.GearConfig(
                             transmission = if (p.useSptCvt) WrxProfile.sptCvt else WrxProfile.manual6,
                             tireCircumferenceM = WrxProfile.tireCircumferenceMeters(
@@ -162,30 +188,58 @@ class ObdService : Service() {
                         val s = _snapshot.value
                         s.gpsSpeedMps to s.gpsHasFix
                     },
-                    thresholdsProvider = { prefs.toAlarmThresholds() }
+                    thresholdsProvider = { latestPrefs.toAlarmThresholds() }
                 )
                 poller = pollerInstance
-                scope.launch {
-                    pollerInstance.snapshot.collect { _snapshot.value = it }
+                launch {
+                    try {
+                        pollerInstance.snapshot.collect { frame ->
+                            if (latestPrefs.useSimulator) return@collect
+                            _snapshot.value = frame.copy(usingSimulator = false)
+                        }
+                    } finally {
+                        prefsWatcher.cancel()
+                    }
                 }
                 pollerInstance.start()
             } catch (t: Throwable) {
                 Log.e(TAG, "Live OBD failed", t)
                 _status.value = "Error: ${t.message}"
-                _snapshot.updateConnected(false)
+                publishPhoneOnlyIdle()
             }
         }
     }
 
-    private fun stopSession() {
+    private fun stopSession(publishIdle: Boolean) {
         simJob?.cancel()
         simJob = null
+        liveJob?.cancel()
+        liveJob = null
         poller?.stop()
         poller = null
         connection?.close()
         connection = null
-        _status.value = "Stopped"
-        _snapshot.updateConnected(false)
+        if (publishIdle) {
+            _status.value = "Stopped"
+            publishPhoneOnlyIdle()
+        }
+    }
+
+    private fun publishPhoneOnlyIdle() {
+        val gpsSpeed = _snapshot.value.gpsSpeedMps
+        val gpsFix = _snapshot.value.gpsHasFix
+        _snapshot.value = VehicleSnapshot(
+            timestampMs = System.currentTimeMillis(),
+            gpsSpeedMps = gpsSpeed,
+            gpsHasFix = gpsFix,
+            obdConnected = false,
+            usingSimulator = false,
+            alarms = AlarmEvaluator.evaluate(
+                VehicleSnapshot(gpsSpeedMps = gpsSpeed, gpsHasFix = gpsFix),
+                WrxProfile.AlarmThresholds(),
+                expectObd = true
+            )
+        )
     }
 
     private fun createChannel() {
@@ -196,9 +250,5 @@ class ObdService : Service() {
             NotificationManager.IMPORTANCE_LOW
         )
         manager.createNotificationChannel(channel)
-    }
-
-    private fun MutableStateFlow<VehicleSnapshot>.updateConnected(connected: Boolean) {
-        value = value.copy(obdConnected = connected)
     }
 }

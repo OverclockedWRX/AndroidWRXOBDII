@@ -79,7 +79,8 @@ fun HudScreen(
                     previousRpm = snapshot.previousRpm,
                     sampleAgeMs = snapshot.rpmSampleAgeMs,
                     redline = preferences.redlineRpm,
-                    gear = if (GaugeId.GEAR in preferences.enabledGauges) snapshot.gear else null
+                    gear = if (GaugeId.GEAR in preferences.enabledGauges) snapshot.gear else null,
+                    threeDimensional = preferences.rpmGauge3d
                 )
             }
 
@@ -175,6 +176,9 @@ fun HudScreen(
                         append(connectionStatus)
                         if (snapshot.usingSimulator) append("  [SIM]")
                         snapshot.oilTempSource?.let { append("  OIL:$it") }
+                        append("  GPS:")
+                        append(preferences.gpsSourceMode.name)
+                        append(if (snapshot.gpsHasFix) "+" else "-")
                     },
                     color = HudColors.TextDim,
                     fontSize = 11.sp,
