@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WRX Race HUD</string>
+    <string name="obd_notification_channel">OBD Link</string>
+    <string name="obd_notification_title">OBDLink connected</string>
+    <string name="obd_notification_text">Reading vehicle data for the race HUD</string>
+</resources>
