@@ -146,8 +146,7 @@ class SettingsRepository(private val context: Context) {
             pinkyMode = this[Keys.pinkyMode] ?: defaults.pinkyMode,
             dangerToManifold = this[Keys.dangerToManifold] ?: defaults.dangerToManifold,
             rpmGauge3d = this[Keys.rpmGauge3d] ?: defaults.rpmGauge3d,
-            motionDisplayMode = this[Keys.motionDisplayMode]
-                ?.let { runCatching { MotionDisplayMode.valueOf(it) }.getOrNull() }
+            motionDisplayMode = MotionDisplayMode.fromStored(this[Keys.motionDisplayMode])
                 ?: defaults.motionDisplayMode,
             motionCalibrated = this[Keys.motionCalibrated] ?: defaults.motionCalibrated,
             motionCalibPitchDeg = this[Keys.motionCalibPitch] ?: defaults.motionCalibPitchDeg,

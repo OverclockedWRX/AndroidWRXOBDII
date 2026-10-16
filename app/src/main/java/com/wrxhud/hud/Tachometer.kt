@@ -49,7 +49,7 @@ fun Tachometer(
     redline: Int,
     gear: Int?,
     motion: MotionReading = MotionReading(),
-    motionDisplayMode: MotionDisplayMode = MotionDisplayMode.TRIPLE,
+    motionDisplayMode: MotionDisplayMode = MotionDisplayMode.RINGS,
     threeDimensional: Boolean = false,
     modifier: Modifier = Modifier
 ) {

@@ -1,17 +1,26 @@
 package com.wrxhud.settings
 
 enum class MotionDisplayMode {
-    /** Compact numeric PIT / ROL / YAW / G strip. */
+    /** Compact numeric PIT / ROL / G strip. */
     TEXT,
-    /** Three circular gauges, each with a 3D car for pitch, roll, yaw. */
-    TRIPLE,
-    /** One circular gauge combining pitch + roll + yaw on a single car. */
+    /** Dual circular gauges — pitch (side) + roll (rear) WRX rings. */
+    RINGS,
+    /** One circular gauge combining pitch + roll on a single car. */
     COMBINED;
 
     val label: String
         get() = when (this) {
             TEXT -> "Text"
-            TRIPLE -> "Triple rings"
+            RINGS -> "Pitch / roll rings"
             COMBINED -> "Combined"
         }
+
+    companion object {
+        fun fromStored(raw: String?): MotionDisplayMode? {
+            if (raw == null) return null
+            // Migrate pre-0.9.1 "TRIPLE" (included yaw) → dual rings.
+            if (raw == "TRIPLE") return RINGS
+            return runCatching { valueOf(raw) }.getOrNull()
+        }
+    }
 }

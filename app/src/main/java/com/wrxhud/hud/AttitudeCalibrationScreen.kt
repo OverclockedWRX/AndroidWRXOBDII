@@ -87,7 +87,7 @@ fun AttitudeCalibrationScreen(
         val stats = computeCalibrationStats(pitches, rolls, yaws, gs)
         when (val result = evaluateMountCalibration(stats)) {
             is CalibrationResult.Ok -> {
-                status = "Calibrated — pitch/roll/yaw zeroed to this mount."
+                status = "Calibrated — pitch/roll zeroed to this mount."
                 running = false
                 progress = 0f
                 onCalibrated(result.calibration)
@@ -118,7 +118,7 @@ fun AttitudeCalibrationScreen(
             fontFamily = FontFamily.Monospace
         )
         Text(
-            text = "Pitch, roll, and yaw are measured relative to how the phone sits in the car. " +
+            text = "Pitch and roll are measured relative to how the phone sits in the car. " +
                 "After mounting, park on level ground and calibrate once so the HUD shows true attitude.",
             color = HudColors.TextPrimary,
             fontSize = 14.sp,
@@ -176,7 +176,6 @@ fun AttitudeCalibrationScreen(
                 ) {
                     LiveCell("PIT", formatSignedDegrees(motion.pitchDeg))
                     LiveCell("ROL", formatSignedDegrees(motion.rollDeg))
-                    LiveCell("YAW", formatSignedDegrees(motion.yawDeg))
                     LiveCell("G", formatGForce(motion.gForce))
                 }
             }

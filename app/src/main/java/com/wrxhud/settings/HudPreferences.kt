@@ -70,7 +70,7 @@ data class HudPreferences(
     /** Extruded / beveled 3D look for the RPM bar tach. */
     val rpmGauge3d: Boolean = false,
     /** How pitch / roll / yaw are shown next to the tach. */
-    val motionDisplayMode: MotionDisplayMode = MotionDisplayMode.TRIPLE,
+    val motionDisplayMode: MotionDisplayMode = MotionDisplayMode.RINGS,
     /** True after the user completes the in-car mount accelerometer test. */
     val motionCalibrated: Boolean = false,
     val motionCalibPitchDeg: Float = 0f,
