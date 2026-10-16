@@ -7,7 +7,8 @@ Android 15+ race HUD for **2022–present Subaru WRX (VB / FA24)** using an **OB
 - AiM-style shift lights and bar tachometer with frame-timed RPM interpolation
 - GPS speed display (phone GPS)
 - Calculated gear (6MT or SPT/CVT ratios + tire size)
-- Toggleable gauges: coolant, oil temp, IAT, boost, battery
+- Toggleable gauges: coolant, oil temp, IAT, boost, battery, odometer (when ECU supports it)
+- Zone-colored tach bar (green → amber → red toward redline)
 - Warning lamps: CEL, low fuel, temps, overboost, battery, OBD/GPS link, knock/DAM (when Mode 22 DIDs are confirmed)
 - Simulator mode for UI development without a car
 - Settings stored in DataStore
@@ -45,6 +46,7 @@ Install the APK from `app/build/outputs/apk/debug/`.
 | Gear | Calculated from OBD speed + RPM + WRX ratios |
 | Oil temp | Auto-probed: Mode 01 `5C`, then Mode 22 `0113` / `1153` (header `7E0`) |
 | Oil pressure | Not available (VB has a switch only, no PSI sensor on OBD) |
+| Odometer | Mode 01 `A6` when supported — many 2022+ WRXs return unsupported; tile shows — |
 | Coolant vs “water temp” | Same ECT sensor on FA24 (one Coolant tile) |
 
 ## Confirming oil-temp DIDs

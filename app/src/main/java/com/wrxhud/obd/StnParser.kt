@@ -94,6 +94,21 @@ object StnParser {
         return (data[0].toInt() and 0x80) != 0
     }
 
+    /** Mode 01 PID A6: odometer in km. */
+    fun decodeOdometerKm(data: ByteArray): Float? {
+        if (data.size < 4) return null
+        val raw = (
+            ((data[0].toInt() and 0xFF).toLong() shl 24) or
+                ((data[1].toInt() and 0xFF).toLong() shl 16) or
+                ((data[2].toInt() and 0xFF).toLong() shl 8) or
+                (data[3].toInt() and 0xFF).toLong()
+            )
+        val km = raw / 10f
+        // Reject obviously invalid / unsupported padding
+        if (km < 0f || km > 2_000_000f) return null
+        return km
+    }
+
     fun decodeSupportedPidBitmask(data: ByteArray): Set<Int> {
         if (data.size < 4) return emptySet()
         val supported = mutableSetOf<Int>()

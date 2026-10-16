@@ -16,7 +16,8 @@ data class HudPreferences(
         GaugeId.OIL_TEMP,
         GaugeId.INTAKE_AIR_TEMP,
         GaugeId.BOOST,
-        GaugeId.BATTERY
+        GaugeId.BATTERY,
+        GaugeId.ODOMETER
     ),
     val enabledLamps: Set<LampId> = setOf(
         LampId.CEL,

@@ -55,6 +55,7 @@ class ObdPoller(
     private var oilTempMode22Did: Int? = null
     private var useMode01OilTemp: Boolean = false
     private var oilTempSourceLabel: String = "none"
+    private var odometerSupported: Boolean = false
 
     private data class SlowPid(
         val name: String,
@@ -106,9 +107,29 @@ class ObdPoller(
         mergeSupport(0x00, 0)
         if (supportedPids.contains(0x20)) mergeSupport(0x20, 0x20)
         if (supportedPids.contains(0x40)) mergeSupport(0x40, 0x40)
+        if (supportedPids.contains(0x60)) mergeSupport(0x60, 0x60)
+        if (supportedPids.contains(0x80)) mergeSupport(0x80, 0x80)
+        if (supportedPids.contains(0xA0)) mergeSupport(0xA0, 0xA0)
         Log.i(TAG, "Supported PIDs: $supportedPids")
 
         discoverOilTemp()
+        discoverOdometer()
+    }
+
+    private fun discoverOdometer() {
+        odometerSupported = false
+        val advertised = supportedPids.contains(WrxProfile.Pid.ODOMETER)
+        // Always try a live read once — some ECUs omit the bitmask but still answer.
+        val raw = connection.sendCommand(ObdCommands.mode01(WrxProfile.Pid.ODOMETER))
+        val data = StnParser.parseMode01(raw, WrxProfile.Pid.ODOMETER)
+        val km = data?.let { StnParser.decodeOdometerKm(it) }
+        if (km != null) {
+            odometerSupported = true
+            _snapshot.update { it.copy(odometerKm = km) }
+            Log.i(TAG, "Odometer confirmed via 01 A6 = $km km (advertised=$advertised)")
+        } else {
+            Log.w(TAG, "Odometer 01 A6 not available (advertised=$advertised, raw=${StnParser.normalize(raw)})")
+        }
     }
 
     /**
@@ -187,6 +208,15 @@ class ObdPoller(
             list += SlowPid("fuel") { pollMode01(WrxProfile.Pid.FUEL_LEVEL) { data ->
                 _snapshot.update { it.copy(fuelLevelPercent = StnParser.decodePercent(data)) }
             } }
+        }
+        if (odometerSupported) {
+            list += SlowPid("odometer") {
+                pollMode01(WrxProfile.Pid.ODOMETER) { data ->
+                    StnParser.decodeOdometerKm(data)?.let { km ->
+                        _snapshot.update { it.copy(odometerKm = km) }
+                    }
+                }
+            }
         }
         if (useMode01OilTemp) {
             list += SlowPid("oilTemp") {

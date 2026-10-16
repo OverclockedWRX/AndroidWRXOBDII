@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +32,8 @@ import com.wrxhud.vehicle.UnitConverters
 import kotlin.math.min
 
 /**
- * Full-width bar tach with frame-timed interpolation between OBD samples.
+ * Full-width bar tach with frame-timed interpolation and zone coloring
+ * (green → amber → red toward redline), AiM-style.
  */
 @Composable
 fun Tachometer(
@@ -43,6 +45,8 @@ fun Tachometer(
     modifier: Modifier = Modifier
 ) {
     val maxRpm = (redline + 500).coerceAtLeast(7000).toFloat()
+    val amberStart = redline * 0.78f
+    val redStart = redline * 0.92f
     var displayRpm by remember { mutableFloatStateOf(rpm ?: 0f) }
 
     LaunchedEffect(rpm, previousRpm, sampleAgeMs) {
@@ -61,6 +65,12 @@ fun Tachometer(
         }
     }
 
+    val rpmColor = when {
+        displayRpm >= redline -> HudColors.Red
+        displayRpm >= redStart -> HudColors.Amber
+        else -> HudColors.TextPrimary
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -75,7 +85,7 @@ fun Tachometer(
         ) {
             Text(
                 text = UnitConverters.formatRpm(displayRpm),
-                color = if (displayRpm >= redline) HudColors.Red else HudColors.TextPrimary,
+                color = rpmColor,
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
@@ -89,30 +99,71 @@ fun Tachometer(
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val trackHeight = size.height * 0.7f
                     val top = (size.height - trackHeight) / 2f
+                    val trackWidth = size.width
+                    val amberX = trackWidth * (amberStart / maxRpm)
+                    val redX = trackWidth * (redStart / maxRpm)
+                    val redlineX = trackWidth * (redline / maxRpm)
+                    val corner = CornerRadius(8f, 8f)
+
+                    // Dim zone track (always visible)
                     drawRoundRect(
                         color = HudColors.TachTrack,
                         topLeft = Offset(0f, top),
-                        size = Size(size.width, trackHeight),
-                        cornerRadius = CornerRadius(8f, 8f)
+                        size = Size(trackWidth, trackHeight),
+                        cornerRadius = corner
                     )
-                    val fraction = min(displayRpm / maxRpm, 1f)
-                    val fillColor = when {
-                        displayRpm >= redline -> HudColors.Red
-                        displayRpm >= redline * 0.9f -> HudColors.Amber
-                        else -> HudColors.TachFill
-                    }
-                    drawRoundRect(
-                        color = fillColor,
+                    drawRect(
+                        color = HudColors.Green.copy(alpha = 0.18f),
                         topLeft = Offset(0f, top),
-                        size = Size(size.width * fraction, trackHeight),
-                        cornerRadius = CornerRadius(8f, 8f)
+                        size = Size(amberX, trackHeight)
                     )
+                    drawRect(
+                        color = HudColors.Amber.copy(alpha = 0.18f),
+                        topLeft = Offset(amberX, top),
+                        size = Size(redX - amberX, trackHeight)
+                    )
+                    drawRect(
+                        color = HudColors.Red.copy(alpha = 0.22f),
+                        topLeft = Offset(redX, top),
+                        size = Size(trackWidth - redX, trackHeight)
+                    )
+
+                    // Active fill with green→amber→red gradient clipped to current RPM
+                    val fraction = min(displayRpm / maxRpm, 1f)
+                    val fillWidth = trackWidth * fraction
+                    if (fillWidth > 0f) {
+                        drawRoundRect(
+                            brush = Brush.horizontalGradient(
+                                colorStops = arrayOf(
+                                    0f to HudColors.Green,
+                                    (amberStart / maxRpm) to HudColors.Green,
+                                    (redStart / maxRpm) to HudColors.Amber,
+                                    (redline / maxRpm) to HudColors.Red,
+                                    1f to HudColors.Red
+                                ),
+                                startX = 0f,
+                                endX = trackWidth
+                            ),
+                            topLeft = Offset(0f, top),
+                            size = Size(fillWidth, trackHeight),
+                            cornerRadius = corner
+                        )
+                    }
+
+                    // Zone tick marks
+                    listOf(amberX, redX).forEach { x ->
+                        drawLine(
+                            color = Color.Black.copy(alpha = 0.45f),
+                            start = Offset(x, top),
+                            end = Offset(x, top + trackHeight),
+                            strokeWidth = 2f
+                        )
+                    }
                     // Redline marker
-                    val redX = size.width * (redline / maxRpm)
                     drawLine(
                         color = HudColors.Accent,
-                        start = Offset(redX, top - 4f),
-                        end = Offset(redX, top + trackHeight + 4f),
+                        start = Offset(redlineX, top - 4f),
+                        end = Offset(redlineX, top + trackHeight + 4f),
                         strokeWidth = 3f
                     )
                 }

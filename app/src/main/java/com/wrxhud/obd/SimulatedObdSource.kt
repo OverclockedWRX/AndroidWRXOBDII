@@ -52,6 +52,7 @@ class SimulatedObdSource(
                 boostPsi = boost,
                 batteryVolts = 13.8f + 0.2f * sin(t).toFloat(),
                 fuelLevelPercent = 55f,
+                odometerKm = 42_150f,
                 milOn = false,
                 knockActive = false,
                 damLow = false,

@@ -99,6 +99,8 @@ object WrxProfile {
         const val CONTROL_MODULE_VOLTAGE = 0x42
         /** SAE engine oil temperature (°C = A - 40). */
         const val OIL_TEMP = 0x5C
+        /** SAE odometer (km = (A<<24|B<<16|C<<8|D) / 10). Often unsupported on 2022+ WRX. */
+        const val ODOMETER = 0xA6
     }
 
     data class AlarmThresholds(
