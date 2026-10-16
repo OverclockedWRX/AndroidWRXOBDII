@@ -118,7 +118,7 @@ class ObdService : Service() {
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(getString(R.string.obd_notification_title))
             .setContentText(getString(R.string.obd_notification_text))
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_stat_notify)
             .setContentIntent(pending)
             .setOngoing(true)
             .build()
