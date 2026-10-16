@@ -28,7 +28,7 @@ Open the project in Android Studio (Ladybug or newer) or:
 ./gradlew :app:assembleDebug
 ```
 
-Install the APK from `app/build/outputs/apk/debug/`.
+Install the APK from [`releases/WRXRaceHUD-0.1.0-debug.apk`](releases/WRXRaceHUD-0.1.0-debug.apk), or build with Gradle and use `app/build/outputs/apk/debug/`.
 
 ## First run
 
