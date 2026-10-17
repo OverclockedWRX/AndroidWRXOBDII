@@ -50,9 +50,7 @@ data class HudPreferences(
         LampId.LOW_BATTERY,
         LampId.LOW_OIL_PRESSURE,
         LampId.LINK_LOST,
-        LampId.GPS_LOST,
-        LampId.KNOCK,
-        LampId.DAM
+        LampId.GPS_LOST
     ),
     val tempUnit: TempUnit = TempUnit.F,
     val speedUnit: SpeedUnit = SpeedUnit.MPH,
@@ -80,8 +78,8 @@ data class HudPreferences(
     /** How pitch / roll / G are shown next to the tach. */
     val motionDisplayMode: MotionDisplayMode = MotionDisplayMode.RINGS,
     /** Which motion gauges appear (text strip / rings / combined side metrics). */
-    val showMotionPitch: Boolean = true,
-    val showMotionRoll: Boolean = true,
+    val showMotionPitch: Boolean = false,
+    val showMotionRoll: Boolean = false,
     val showMotionGForce: Boolean = true,
     /** True after the user completes the in-car mount accelerometer test. */
     val motionCalibrated: Boolean = false,

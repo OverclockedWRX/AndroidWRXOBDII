@@ -21,12 +21,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.vehicle.UnitConverters
@@ -79,46 +83,94 @@ fun GearIndicator(
     val borderColor = lerp(HudColors.Border, HudColors.Accent, flash.value)
     val panelColor = lerp(HudColors.Panel, HudColors.Accent.copy(alpha = 0.22f), flash.value * 0.5f)
 
-    val boxW = if (compact) 96.dp else 118.dp
-    val boxH = if (compact) 108.dp else 128.dp
-    val gearSp = if (compact) 64.sp else 80.sp
+    val boxW = if (compact) 72.dp else TachSideClusterDims.width
+    val boxH = if (compact) 80.dp else TachSideClusterDims.columnHeight
+    val gearSp = if (compact) 48.sp else TachSideClusterDims.gearSp
 
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = "GEAR",
-            color = HudColors.TextDim,
-            fontSize = if (compact) 11.sp else 13.sp,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(bottom = if (compact) 4.dp else 6.dp)
-        )
-        Box(
-            modifier = Modifier
-                .size(width = boxW, height = boxH)
-                .clip(shape)
-                .background(panelColor, shape)
-                .border(2.dp, borderColor, shape),
-            contentAlignment = Alignment.Center
+    if (compact) {
+        Column(
+            modifier = modifier,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = displayed,
-                color = HudColors.TextPrimary,
-                fontSize = gearSp,
-                fontWeight = FontWeight.Bold,
+                text = "GEAR",
+                color = HudColors.TextDim,
+                fontSize = 9.sp,
                 fontFamily = FontFamily.Monospace,
-                modifier = Modifier.graphicsLayer {
-                    rotationX = flip.value
-                    cameraDistance = perspectivePx * density.density
-                    transformOrigin = TransformOrigin(0.5f, 0.5f)
-                    alpha = 1f - (abs(flip.value) / 90f) * 0.55f
-                    val scalePunch = 1f + (0.08f * flash.value)
-                    scaleX = scalePunch
-                    scaleY = scalePunch
-                }
+                modifier = Modifier.padding(bottom = 2.dp)
+            )
+            GearFace(
+                displayed = displayed,
+                boxW = boxW,
+                boxH = boxH,
+                gearSp = gearSp,
+                shape = shape,
+                panelColor = panelColor,
+                borderColor = borderColor,
+                flip = flip.value,
+                flash = flash.value,
+                perspectivePx = perspectivePx,
+                density = density
             )
         }
+    } else {
+        // Side cluster: no caption — face matches SPD/LIM stack height.
+        GearFace(
+            displayed = displayed,
+            boxW = boxW,
+            boxH = boxH,
+            gearSp = gearSp,
+            shape = shape,
+            panelColor = panelColor,
+            borderColor = borderColor,
+            flip = flip.value,
+            flash = flash.value,
+            perspectivePx = perspectivePx,
+            density = density,
+            modifier = modifier
+        )
+    }
+}
+
+@Composable
+private fun GearFace(
+    displayed: String,
+    boxW: Dp,
+    boxH: Dp,
+    gearSp: TextUnit,
+    shape: RoundedCornerShape,
+    panelColor: Color,
+    borderColor: Color,
+    flip: Float,
+    flash: Float,
+    perspectivePx: Float,
+    density: Density,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(width = boxW, height = boxH)
+            .clip(shape)
+            .background(panelColor, shape)
+            .border(2.dp, borderColor, shape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = displayed,
+            color = HudColors.TextPrimary,
+            fontSize = gearSp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.graphicsLayer {
+                rotationX = flip
+                cameraDistance = perspectivePx * density.density
+                transformOrigin = TransformOrigin(0.5f, 0.5f)
+                alpha = 1f - (abs(flip) / 90f) * 0.55f
+                val scalePunch = 1f + (0.08f * flash)
+                scaleX = scalePunch
+                scaleY = scalePunch
+            }
+        )
     }
 }
 

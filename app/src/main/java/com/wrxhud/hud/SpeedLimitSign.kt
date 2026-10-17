@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.gps.SpeedLimitReading
@@ -33,8 +34,9 @@ private val SignBorder = Color(0xFF1A1A1A)
 fun SpeedLimitSign(
     reading: SpeedLimitReading,
     modifier: Modifier = Modifier,
-    /** Same outer box as [GearIndicator] when true (tach row). */
-    compact: Boolean = false
+    /** Tach side-cluster tile (no outer heading; sized to [faceHeight]). */
+    compact: Boolean = false,
+    faceHeight: Dp = TachSideClusterDims.stackedFaceHeight(1)
 ) {
     val valueText = reading.limit?.toString() ?: "—"
     val unitHint = when (reading.unit) {
@@ -44,68 +46,56 @@ fun SpeedLimitSign(
     val footer = if (reading.limit != null) unitHint else (reading.status ?: unitHint)
 
     if (compact) {
-        // Match GearIndicator compact: caption above + 96×108 sign face.
-        val shape = RoundedCornerShape(10.dp)
-        Column(
-            modifier = modifier,
-            horizontalAlignment = Alignment.CenterHorizontally
+        // No outer HUD heading — sign face only; height shared with SPD / G-Force / GEAR.
+        val shape = RoundedCornerShape(8.dp)
+        val valueSp = if (faceHeight < 100.dp) 32.sp else 40.sp
+        Box(
+            modifier = modifier
+                .size(width = TachSideClusterDims.width, height = faceHeight)
+                .clip(shape)
+                .background(SignWhite, shape)
+                .border(2.dp, SignBorder, shape)
+                .padding(horizontal = 4.dp, vertical = 3.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "LIM",
-                color = HudColors.TextDim,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 4.dp),
-                maxLines = 1,
-                softWrap = false
-            )
-            Box(
-                modifier = Modifier
-                    .size(width = 96.dp, height = 108.dp)
-                    .clip(shape)
-                    .background(SignWhite, shape)
-                    .border(2.dp, SignBorder, shape),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "LIMIT",
+                    color = SignBlack,
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 1.sp,
+                    maxLines = 1,
+                    softWrap = false
+                )
+                Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = "LIMIT",
+                        text = "000",
+                        color = Color.Transparent,
+                        fontSize = valueSp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = valueText,
                         color = SignBlack,
-                        fontSize = 11.sp,
+                        fontSize = valueSp,
                         fontFamily = FontFamily.Monospace,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp,
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "000",
-                            color = Color.Transparent,
-                            fontSize = 48.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = valueText,
-                            color = SignBlack,
-                            fontSize = 48.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                    Text(
-                        text = footer,
-                        color = SignBlack.copy(alpha = 0.7f),
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
+                        textAlign = TextAlign.Center,
                         maxLines = 1,
                         softWrap = false
                     )
                 }
+                Text(
+                    text = footer,
+                    color = SignBlack.copy(alpha = 0.7f),
+                    fontSize = 8.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    softWrap = false
+                )
             }
         }
         return

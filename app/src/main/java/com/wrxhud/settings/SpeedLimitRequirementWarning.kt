@@ -37,7 +37,8 @@ fun SpeedLimitRequirementWarning(modifier: Modifier = Modifier) {
         )
         Text(
             text = "Speed limits need a GPS fix and a data connection to look up posted limits " +
-                "from OpenStreetMap. If this road was looked up before, the cached limit still " +
+                "from OpenStreetMap Overpass mirrors (HTTPS). Your coordinates leave the device " +
+                "for that lookup. If this road was looked up before, the cached limit still " +
                 "shows when you have GPS but no data.",
             color = HudColors.TextPrimary,
             fontSize = 12.sp,

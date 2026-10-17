@@ -5,11 +5,15 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -59,7 +63,9 @@ fun MotionAttitudeDisplay(
     motion: MotionReading,
     mode: MotionDisplayMode,
     visibility: MotionGaugeVisibility = MotionGaugeVisibility(),
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Smaller rings for the tach row (aligned with RPM bar height). */
+    compact: Boolean = false
 ) {
     if (!visibility.anyVisible) return
     when (mode) {
@@ -71,13 +77,72 @@ fun MotionAttitudeDisplay(
         MotionDisplayMode.RINGS -> DualAttitudeRings(
             motion = motion,
             visibility = visibility,
-            modifier = modifier
+            modifier = modifier,
+            ringSize = if (compact) 52.dp else 76.dp
         )
         MotionDisplayMode.COMBINED -> CombinedAttitudeRing(
             motion = motion,
             visibility = visibility,
-            modifier = modifier
+            modifier = modifier,
+            ringSize = if (compact) 56.dp else 84.dp
         )
+    }
+}
+
+/**
+ * G-force tile for the tach side cluster — reading inside the border, above the circle.
+ */
+@Composable
+fun TachMotionCluster(
+    motion: MotionReading,
+    mode: MotionDisplayMode,
+    visibility: MotionGaugeVisibility,
+    modifier: Modifier = Modifier
+) {
+    if (!visibility.gForce) return
+    val shape = RoundedCornerShape(8.dp)
+    val palette = HudColors.Attitude
+
+    Box(
+        modifier = modifier
+            .size(
+                width = TachSideClusterDims.width,
+                height = TachSideClusterDims.columnHeight
+            )
+            .clip(shape)
+            .background(HudColors.Panel, shape)
+            .border(2.dp, HudColors.Border, shape)
+            .padding(horizontal = 4.dp, vertical = 4.dp)
+    ) {
+        if (mode == MotionDisplayMode.TEXT) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                MotionCell("G", formatGForce(motion.gForce))
+            }
+        } else {
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = formatGForce(motion.gForce),
+                    color = palette.glow,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    val side = minOf(maxWidth, maxHeight)
+                    GForceGauge(motion = motion, size = side, showValue = false)
+                }
+            }
+        }
     }
 }
 
@@ -127,37 +192,48 @@ private fun MotionCell(label: String, value: String) {
 private fun DualAttitudeRings(
     motion: MotionReading,
     visibility: MotionGaugeVisibility,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    ringSize: Dp = 76.dp
 ) {
     val shape = RoundedCornerShape(8.dp)
+    val gap = if (ringSize <= 56.dp) 6.dp else 10.dp
+    val pad = if (ringSize <= 56.dp) 3.dp else 4.dp
     Row(
         modifier = modifier
             .clip(shape)
             .background(HudColors.Panel, shape)
             .border(1.dp, HudColors.Border, shape)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = if (ringSize <= 56.dp) 4.dp else 6.dp, vertical = pad),
+        horizontalArrangement = Arrangement.spacedBy(gap),
         verticalAlignment = Alignment.Bottom
     ) {
         if (visibility.pitch) {
             InclinometerGauge(
                 degrees = motion.pitchDeg,
                 kind = InclinometerKind.PITCH,
-                size = 76.dp
+                size = ringSize
             )
         }
         if (visibility.roll) {
             InclinometerGauge(
                 degrees = motion.rollDeg,
                 kind = InclinometerKind.ROLL,
-                size = 76.dp
+                size = ringSize
             )
         }
         if (visibility.gForce) {
-            GForceGauge(
-                motion = motion,
-                size = 76.dp
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = formatGForce(motion.gForce),
+                    color = HudColors.Attitude.glow,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+                GForceGauge(motion = motion, size = ringSize, showValue = false)
+            }
         }
     }
 }
@@ -166,16 +242,18 @@ private fun DualAttitudeRings(
 private fun CombinedAttitudeRing(
     motion: MotionReading,
     visibility: MotionGaugeVisibility,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    ringSize: Dp = 84.dp
 ) {
     val shape = RoundedCornerShape(8.dp)
+    val side = if (ringSize <= 60.dp) ringSize else 76.dp
     Row(
         modifier = modifier
             .clip(shape)
             .background(HudColors.Panel, shape)
             .border(1.dp, HudColors.Border, shape)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+            .padding(horizontal = 6.dp, vertical = 3.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.Bottom
     ) {
         when {
@@ -184,26 +262,37 @@ private fun CombinedAttitudeRing(
                     degrees = motion.pitchDeg,
                     secondaryDegrees = motion.rollDeg,
                     kind = InclinometerKind.COMBINED,
-                    size = 84.dp
+                    size = ringSize
                 )
             }
             visibility.pitch -> {
                 InclinometerGauge(
                     degrees = motion.pitchDeg,
                     kind = InclinometerKind.PITCH,
-                    size = 76.dp
+                    size = side
                 )
             }
             visibility.roll -> {
                 InclinometerGauge(
                     degrees = motion.rollDeg,
                     kind = InclinometerKind.ROLL,
-                    size = 76.dp
+                    size = side
                 )
             }
         }
         if (visibility.gForce) {
-            GForceGauge(motion = motion, size = 76.dp)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = formatGForce(motion.gForce),
+                    color = HudColors.Attitude.glow,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    modifier = Modifier.padding(bottom = 2.dp)
+                )
+                GForceGauge(motion = motion, size = side, showValue = false)
+            }
         }
         if (visibility.pitch || visibility.roll) {
             Column(
@@ -223,7 +312,9 @@ private const val G_FULL_SCALE = 1.5f
 @Composable
 private fun GForceGauge(
     motion: MotionReading,
-    size: Dp
+    size: Dp,
+    /** When false, only the circle is drawn (value is shown by the caller above). */
+    showValue: Boolean = true
 ) {
     val trail = remember { mutableStateListOf<Offset>() }
     val lat = motion.lateralG
@@ -241,6 +332,11 @@ private fun GForceGauge(
     val trailSnapshot = trail.toList()
     val palette = HudColors.Attitude
 
+    val labelSp = when {
+        size >= 100.dp -> 16.sp
+        size >= 72.dp -> 13.sp
+        else -> 10.sp
+    }
     Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawGForceFace(
@@ -251,17 +347,19 @@ private fun GForceGauge(
                 palette = palette
             )
         }
-        Text(
-            text = formatGForce(motion.gForce),
-            color = palette.glow,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            maxLines = 1,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = size * 0.18f)
-        )
+        if (showValue) {
+            Text(
+                text = formatGForce(motion.gForce),
+                color = palette.glow,
+                fontSize = labelSp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 2.dp)
+            )
+        }
     }
 }
 

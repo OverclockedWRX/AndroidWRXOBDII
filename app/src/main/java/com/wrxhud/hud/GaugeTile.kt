@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.vehicle.AlarmEvaluator
@@ -57,17 +58,17 @@ fun GaugeTile(
 
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(6.dp))
             .background(HudColors.Panel)
-            .border(1.dp, HudColors.Border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 6.dp, vertical = 6.dp),
+            .border(1.dp, HudColors.Border, RoundedCornerShape(6.dp))
+            .padding(horizontal = 4.dp, vertical = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = label,
             color = HudColors.TextDim,
-            fontSize = 10.sp,
+            fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -77,7 +78,7 @@ fun GaugeTile(
         Text(
             text = valueText,
             color = valueColor,
-            fontSize = 24.sp,
+            fontSize = 18.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
@@ -86,7 +87,7 @@ fun GaugeTile(
         Text(
             text = unit,
             color = HudColors.TextDim,
-            fontSize = 9.sp,
+            fontSize = 8.sp,
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false
@@ -126,7 +127,7 @@ fun BoostVacTile(
         severity == AlarmEvaluator.Severity.WARN -> HudColors.Amber
         else -> HudColors.TextPrimary
     }
-    val shape = RoundedCornerShape(8.dp)
+    val shape = RoundedCornerShape(6.dp)
     val panelColor = if (inBoost) {
         lerp(HudColors.Panel, HudColors.BoostBlue.copy(alpha = 0.45f), 0.55f)
     } else {
@@ -139,14 +140,14 @@ fun BoostVacTile(
             .clip(shape)
             .background(panelColor, shape)
             .border(1.dp, borderColor, shape)
-            .padding(horizontal = 6.dp, vertical = 6.dp),
+            .padding(horizontal = 4.dp, vertical = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = label,
             color = if (inBoost) HudColors.BoostBlue else HudColors.TextDim,
-            fontSize = 10.sp,
+            fontSize = 9.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -155,7 +156,7 @@ fun BoostVacTile(
         Text(
             text = UnitConverters.formatPressure(psi, unit),
             color = valueColor,
-            fontSize = 24.sp,
+            fontSize = 18.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
@@ -164,7 +165,7 @@ fun BoostVacTile(
         Text(
             text = unit.name,
             color = HudColors.TextDim,
-            fontSize = 9.sp,
+            fontSize = 8.sp,
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false
@@ -178,62 +179,49 @@ fun SpeedTile(
     value: String,
     unit: String,
     modifier: Modifier = Modifier,
-    /** Same outer box as [GearIndicator] when true (tach row). */
-    compact: Boolean = false
+    /** Tach side-cluster tile (no outer heading; sized to [faceHeight]). */
+    compact: Boolean = false,
+    faceHeight: Dp = TachSideClusterDims.stackedFaceHeight(1)
 ) {
     if (compact) {
-        // Match GearIndicator compact: 96×108 box + GEAR-style caption above.
-        val shape = RoundedCornerShape(10.dp)
-        Column(
-            modifier = modifier,
-            horizontalAlignment = Alignment.CenterHorizontally
+        val shape = RoundedCornerShape(8.dp)
+        val valueSp = if (faceHeight < 100.dp) 32.sp else 40.sp
+        Box(
+            modifier = modifier
+                .size(width = TachSideClusterDims.width, height = faceHeight)
+                .clip(shape)
+                .background(HudColors.Panel, shape)
+                .border(2.dp, HudColors.Border, shape),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = label,
-                color = HudColors.TextDim,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                modifier = Modifier.padding(bottom = 4.dp),
-                maxLines = 1,
-                softWrap = false
-            )
-            Box(
-                modifier = Modifier
-                    .size(width = 96.dp, height = 108.dp)
-                    .clip(shape)
-                    .background(HudColors.Panel, shape)
-                    .border(2.dp, HudColors.Border, shape),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "000",
-                            color = Color.Transparent,
-                            fontSize = 48.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = value,
-                            color = HudColors.TextPrimary,
-                            fontSize = 48.sp,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Box(contentAlignment = Alignment.Center) {
                     Text(
-                        text = unit,
-                        color = HudColors.TextDim,
-                        fontSize = 11.sp,
+                        text = "000",
+                        color = Color.Transparent,
+                        fontSize = valueSp,
                         fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = value,
+                        color = HudColors.TextPrimary,
+                        fontSize = valueSp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
                         maxLines = 1,
                         softWrap = false
                     )
                 }
+                Text(
+                    text = unit,
+                    color = HudColors.TextDim,
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1,
+                    softWrap = false
+                )
             }
         }
         return

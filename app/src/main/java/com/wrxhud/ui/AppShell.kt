@@ -10,6 +10,7 @@ import com.wrxhud.hud.HudUiState
 import com.wrxhud.obd.DtcReadResult
 import com.wrxhud.obd.PidScanRow
 import com.wrxhud.settings.SettingsScreen
+import com.wrxhud.vehicle.VehicleInfo
 
 @Composable
 fun AppShell(
@@ -18,6 +19,7 @@ fun AppShell(
     onScanPids: suspend () -> List<PidScanRow> = { emptyList() },
     onReadDtcs: suspend () -> DtcReadResult = { DtcReadResult(message = "Not connected") },
     onClearDtcs: suspend () -> Boolean = { false },
+    onRefreshVehicleInfo: suspend () -> VehicleInfo = { ui.vehicleInfo },
     connectionStatus: String = ui.connectionStatus,
     onRecalibrateMotion: () -> Unit = {},
     onToggleLogging: () -> Unit = {}
@@ -27,11 +29,13 @@ fun AppShell(
     if (showSettings) {
         SettingsScreen(
             preferences = ui.preferences,
+            vehicleInfo = ui.vehicleInfo,
             onBack = { showSettings = false },
             onUpdate = onUpdatePreferences,
             onScanPids = onScanPids,
             onReadDtcs = onReadDtcs,
             onClearDtcs = onClearDtcs,
+            onRefreshVehicleInfo = onRefreshVehicleInfo,
             connectionStatus = connectionStatus,
             onRecalibrateMotion = {
                 showSettings = false

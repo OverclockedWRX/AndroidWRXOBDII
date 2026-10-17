@@ -4,6 +4,7 @@ import android.util.Log
 import com.wrxhud.vehicle.AlarmEvaluator
 import com.wrxhud.vehicle.GearCalculator
 import com.wrxhud.vehicle.UnitConverters
+import com.wrxhud.vehicle.VehicleInfo
 import com.wrxhud.vehicle.VehicleSnapshot
 import com.wrxhud.vehicle.WrxProfile
 import kotlinx.coroutines.CancellationException
@@ -47,6 +48,9 @@ class ObdPoller(
 
     private val _snapshot = MutableStateFlow(VehicleSnapshot())
     val snapshot: StateFlow<VehicleSnapshot> = _snapshot.asStateFlow()
+
+    private val _vehicleInfo = MutableStateFlow(VehicleInfo())
+    val vehicleInfo: StateFlow<VehicleInfo> = _vehicleInfo.asStateFlow()
 
     private val running = AtomicBoolean(false)
     private var job: Job? = null
@@ -168,6 +172,23 @@ class ObdPoller(
             useMode01Map = false
             mapMode22Did = null
         }
+
+        refreshVehicleInfo()
+    }
+
+    /** Re-query VIN / CALID / adapter identity (also runs after capability discovery). */
+    fun refreshVehicleInfo() {
+        val mapLabel = when {
+            assignment(MappableSignal.BOOST_MAP) != null -> "user"
+            useMode01Map -> "01 %02X".format(mapMode01Pid)
+            mapMode22Did != null -> "22 %04X".format(mapMode22Did)
+            else -> null
+        }
+        _vehicleInfo.value = VehicleInfoReader.read(
+            connection = connection,
+            oilTempSource = oilTempSourceLabel,
+            mapSource = mapLabel
+        )
     }
 
     private fun assignment(signal: MappableSignal): PidAssignment? =

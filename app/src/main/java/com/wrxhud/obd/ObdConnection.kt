@@ -76,7 +76,11 @@ class ObdConnection(
     }
 
     @Synchronized
-    fun sendCommand(command: String, waitForPrompt: Boolean = true): String {
+    fun sendCommand(
+        command: String,
+        waitForPrompt: Boolean = true,
+        timeoutMs: Long = READ_TIMEOUT_MS
+    ): String {
         check(open.get()) { "OBD connection is closed" }
         // Never emit write / clear / session / IO / memory traffic onto OBD-II / CAN.
         ObdReadOnlyGuard.assertAllowed(command)
@@ -95,7 +99,7 @@ class ObdConnection(
         if (!waitForPrompt) return ""
 
         val sb = StringBuilder()
-        val deadline = System.currentTimeMillis() + READ_TIMEOUT_MS
+        val deadline = System.currentTimeMillis() + timeoutMs.coerceAtLeast(200L)
         while (System.currentTimeMillis() < deadline) {
             if (!r.ready()) {
                 Thread.sleep(2)
@@ -108,7 +112,9 @@ class ObdConnection(
             sb.append(c)
         }
         val response = sb.toString()
-        Log.d(TAG, "CMD $command -> ${response.replace("\r", "\\r").replace("\n", "\\n")}")
+        // Truncate logcat payload — Mode 09 VIN / CALID must not spam full identity strings.
+        val preview = response.replace("\r", "\\r").replace("\n", "\\n").take(48)
+        Log.d(TAG, "CMD $command -> $preview${if (response.length > 48) "…" else ""}")
         return response
     }
 

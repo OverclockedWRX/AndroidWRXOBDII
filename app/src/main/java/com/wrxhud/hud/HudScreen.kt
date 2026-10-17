@@ -57,8 +57,9 @@ fun HudScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .background(HudColors.Background)
-                .padding(8.dp)
+                .padding(horizontal = 4.dp, vertical = 4.dp)
         ) {
+            // Flexible middle: tach grows/shrinks; gauges + lamps always reserved below.
             Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -72,7 +73,10 @@ fun HudScreen(
                     visualStyle = preferences.tachVisualStyle,
                     modifier = Modifier.weight(1f)
                 )
-                IconButton(onClick = onOpenSettings) {
+                IconButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier.height(36.dp)
+                ) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Settings",
@@ -80,8 +84,6 @@ fun HudScreen(
                     )
                 }
             }
-
-            Spacer(Modifier.height(2.dp))
 
             val showTachRow = GaugeId.RPM in preferences.enabledGauges ||
                 GaugeId.THROTTLE in preferences.enabledGauges ||
@@ -103,8 +105,8 @@ fun HudScreen(
                     motion = motion,
                     motionDisplayMode = preferences.motionDisplayMode,
                     motionVisibility = MotionGaugeVisibility(
-                        pitch = preferences.showMotionPitch,
-                        roll = preferences.showMotionRoll,
+                        pitch = false,
+                        roll = false,
                         gForce = preferences.showMotionGForce
                     ),
                     visualStyle = preferences.tachVisualStyle,
@@ -119,22 +121,25 @@ fun HudScreen(
                     },
                     speedUnit = if (useMph) "MPH" else "KM/H",
                     speedLimit = if (preferences.showSpeedLimit) speedLimit else null,
-                    showGear = GaugeId.GEAR in preferences.enabledGauges
+                    showGear = GaugeId.GEAR in preferences.enabledGauges,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
                 )
             }
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
 
             val helixOwnsBoost = preferences.tachVisualStyle == TachVisualStyle.HELIX
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Row(
                     modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
                 ) {
                     if (GaugeId.COOLANT in preferences.enabledGauges) {
                         GaugeTile(
@@ -205,7 +210,7 @@ fun HudScreen(
                 }
             }
 
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(10.dp))
 
             WarningLamps(
                 alarms = snapshot.alarms,
@@ -217,7 +222,7 @@ fun HudScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .padding(horizontal = 4.dp, vertical = 1.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {

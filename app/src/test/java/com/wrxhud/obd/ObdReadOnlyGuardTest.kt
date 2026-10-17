@@ -14,6 +14,13 @@ class ObdReadOnlyGuardTest {
     }
 
     @Test
+    fun allowsMode09VehicleInfoReads() {
+        assertThat(ObdReadOnlyGuard.isAllowed("0902")).isTrue()
+        assertThat(ObdReadOnlyGuard.isAllowed("0904")).isTrue()
+        assertThat(ObdReadOnlyGuard.isAllowed("090A")).isTrue()
+    }
+
+    @Test
     fun allowsDtcReadAndClear() {
         assertThat(ObdReadOnlyGuard.isAllowed("03")).isTrue()
         assertThat(ObdReadOnlyGuard.isAllowed("07")).isTrue()

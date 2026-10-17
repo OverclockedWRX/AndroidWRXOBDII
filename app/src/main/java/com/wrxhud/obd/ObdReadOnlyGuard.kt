@@ -9,6 +9,7 @@ import android.util.Log
  * - ELM/STN adapter setup (`AT*`, `ST*`)
  * - SAE Mode 01 current data (`01xx`)
  * - SAE Mode 03 / 07 / 0A DTC reads
+ * - SAE Mode 09 vehicle information (`09xx`) — VIN / CALID / ECU name (read)
  * - SAE Mode 04 clear DTCs (user-confirmed code reader only — not calibration write)
  * - UDS ReadDataByIdentifier (`22xxxx`)
  *
@@ -46,6 +47,8 @@ object ObdReadOnlyGuard {
             // --- Vehicle bus: diagnostic reads ---
             c.matches(Regex("^01[0-9A-F]{2}$")) -> true
             c == "03" || c == "07" || c == "0A" -> true
+            // Mode 09 vehicle information (VIN, CALID, ECU name) — read only
+            c.matches(Regex("^09[0-9A-F]{2}$")) -> true
             c.matches(Regex("^22[0-9A-F]{4}$")) -> true
 
             // --- Vehicle bus: standard clear-codes (code reader) ---

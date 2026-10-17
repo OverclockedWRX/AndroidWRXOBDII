@@ -11,11 +11,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -39,7 +41,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        keepScreenOn()
         hideSystemUi()
 
         setContent {
@@ -55,6 +57,12 @@ class MainActivity : ComponentActivity() {
 
             SideEffect {
                 HudThemeController.colorTheme = ui.preferences.colorTheme
+            }
+
+            val view = LocalView.current
+            DisposableEffect(Unit) {
+                view.keepScreenOn = true
+                onDispose { view.keepScreenOn = false }
             }
 
             Surface(
@@ -89,6 +97,7 @@ class MainActivity : ComponentActivity() {
                             onScanPids = { viewModel.scanPids() },
                             onReadDtcs = { viewModel.readDtcs() },
                             onClearDtcs = { viewModel.clearDtcs() },
+                            onRefreshVehicleInfo = { viewModel.refreshVehicleInfo() },
                             connectionStatus = ui.connectionStatus,
                             onRecalibrateMotion = viewModel::clearMountCalibration,
                             onToggleLogging = viewModel::toggleDataLog
@@ -99,9 +108,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        keepScreenOn()
+        hideSystemUi()
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) hideSystemUi()
+    }
+
+    private fun keepScreenOn() {
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
 
     private fun hideSystemUi() {

@@ -21,6 +21,7 @@ import com.wrxhud.MainActivity
 import com.wrxhud.R
 import com.wrxhud.settings.SettingsRepository
 import com.wrxhud.vehicle.AlarmEvaluator
+import com.wrxhud.vehicle.VehicleInfo
 import com.wrxhud.vehicle.VehicleSnapshot
 import com.wrxhud.vehicle.WrxProfile
 import kotlinx.coroutines.CoroutineScope
@@ -66,6 +67,9 @@ class ObdService : Service() {
 
     private val _snapshot = MutableStateFlow(VehicleSnapshot())
     val snapshot: StateFlow<VehicleSnapshot> = _snapshot.asStateFlow()
+
+    private val _vehicleInfo = MutableStateFlow(VehicleInfo())
+    val vehicleInfo: StateFlow<VehicleInfo> = _vehicleInfo.asStateFlow()
 
     private val _status = MutableStateFlow("Idle")
     val status: StateFlow<String> = _status.asStateFlow()
@@ -152,6 +156,7 @@ class ObdService : Service() {
                 publishPhoneOnlyIdle()
                 return@launch
             }
+            _vehicleInfo.value = VehicleInfoReader.simulatorPlaceholder()
             SimulatedObdSource(thresholds = prefs.toAlarmThresholds()).snapshots().collect { frame ->
                 _snapshot.value = frame
             }
@@ -234,6 +239,11 @@ class ObdService : Service() {
                 )
                 poller = pollerInstance
                 launch {
+                    pollerInstance.vehicleInfo.collect { info ->
+                        _vehicleInfo.value = info
+                    }
+                }
+                launch {
                     try {
                         pollerInstance.snapshot.collect { frame ->
                             if (latestPrefs.useSimulator) return@collect
@@ -281,6 +291,18 @@ class ObdService : Service() {
         return withPausedPoller(statusWhileBusy = "Clearing DTCs…") { conn ->
             DtcReader(conn).clearCodes()
         } == true
+    }
+
+    /** Re-fetch VIN / CALID / adapter identity while connected. */
+    suspend fun refreshVehicleInfo(): VehicleInfo {
+        val p = poller
+        if (p == null) {
+            return _vehicleInfo.value
+        }
+        return withPausedPoller(statusWhileBusy = "Reading vehicle info…") {
+            p.refreshVehicleInfo()
+            p.vehicleInfo.value
+        } ?: _vehicleInfo.value
     }
 
     private suspend fun <T> withPausedPoller(
@@ -334,6 +356,7 @@ class ObdService : Service() {
         poller = null
         connection?.close()
         connection = null
+        _vehicleInfo.value = VehicleInfo()
         if (publishIdle) {
             _status.value = "Stopped"
             publishPhoneOnlyIdle()

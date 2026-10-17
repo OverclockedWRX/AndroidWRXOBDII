@@ -22,6 +22,7 @@ import com.wrxhud.sensors.relativeTo
 import com.wrxhud.settings.HudPreferences
 import com.wrxhud.settings.SettingsRepository
 import com.wrxhud.telemetry.TelemetryHub
+import com.wrxhud.vehicle.VehicleInfo
 import com.wrxhud.vehicle.VehicleSnapshot
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -39,6 +40,7 @@ data class HudUiState(
     val connectionStatus: String = "Idle",
     val motion: MotionReading = MotionReading(),
     val speedLimit: SpeedLimitReading = SpeedLimitReading(),
+    val vehicleInfo: VehicleInfo = VehicleInfo(),
     val runtimeStarted: Boolean = false,
     val logging: Boolean = false,
     val logFileName: String? = null
@@ -52,6 +54,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     private val dataLogger = CsvDataLogger(application)
 
     private val _serviceSnapshot = MutableStateFlow(VehicleSnapshot())
+    private val _vehicleInfo = MutableStateFlow(VehicleInfo())
     private val _status = MutableStateFlow("Idle")
     private val _runtimeStarted = MutableStateFlow(false)
     private var service: ObdService? = null
@@ -68,6 +71,9 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             }
             viewModelScope.launch {
                 service?.status?.collect { _status.value = it }
+            }
+            viewModelScope.launch {
+                service?.vehicleInfo?.collect { _vehicleInfo.value = it }
             }
         }
 
@@ -90,8 +96,9 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         combine(motion.reading, speedLimitProvider.reading, dataLogger.recording, dataLogger.activeFileName) {
                 motionReading, speedLimit, logging, logName ->
             Quad(motionReading, speedLimit, logging, logName)
-        }
-    ) { core, logSide ->
+        },
+        _vehicleInfo
+    ) { core, logSide, vehicleInfo ->
         val (snapPrefs, statusGps, runtimeStarted) = core
         val (snap, prefs) = snapPrefs
         val (status, gpsReading) = statusGps
@@ -136,12 +143,17 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             calibrated = prefs.motionCalibrated
         )
 
+        val displayVehicleInfo = vehicleInfo.copy(
+            oilTempSource = vehicleInfo.oilTempSource ?: displaySnap.oilTempSource
+        )
+
         HudUiState(
             snapshot = displaySnap,
             preferences = prefs,
             connectionStatus = displayStatus,
             motion = calibratedMotion,
             speedLimit = speedLimit,
+            vehicleInfo = displayVehicleInfo,
             runtimeStarted = runtimeStarted,
             logging = logging,
             logFileName = logName
@@ -274,6 +286,12 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun clearDtcs(): Boolean {
         return service?.clearDtcs() == true
+    }
+
+    suspend fun refreshVehicleInfo(): VehicleInfo {
+        val info = service?.refreshVehicleInfo() ?: _vehicleInfo.value
+        _vehicleInfo.value = info
+        return info
     }
 
     fun isLiveObdConnected(): Boolean = service?.isLiveConnected() == true

@@ -82,16 +82,16 @@ fun ShiftLights(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(if (tall) 34.dp else 28.dp)
-            .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+            .height(if (tall) 26.dp else 22.dp)
+            .padding(horizontal = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         lampStates.forEach { lamp ->
             val face = shiftLightColor(lamp.stageIndex, lamp.lit, stageCount)
             Canvas(
                 modifier = Modifier
                     .weight(1f)
-                    .height(if (tall) 28.dp else 22.dp)
+                    .height(if (tall) 20.dp else 16.dp)
             ) {
                 when (visualStyle) {
                     TachVisualStyle.LIQUID -> drawLampLiquid(

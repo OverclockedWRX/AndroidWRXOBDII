@@ -145,4 +145,77 @@ object StnParser {
         }
         return supported
     }
+
+    /** Printable ASCII from raw DID / info bytes (strip NULs and non-printables). */
+    fun decodeAsciiField(data: ByteArray): String? {
+        if (data.isEmpty()) return null
+        val s = buildString {
+            for (b in data) {
+                val c = (b.toInt() and 0xFF).toChar()
+                if (c in ' '..'~') append(c)
+            }
+        }.trim()
+        return s.ifBlank { null }
+    }
+
+    /**
+     * Mode 09 PID 02 VIN. ELM may return multi-frame `49 02 NN <ascii…>` lines.
+     * Accepts 11–20 alphanumeric chars (17 typical for North America).
+     */
+    fun decodeVinMode09(raw: String): String? {
+        if (isError(raw)) return null
+        val payload = extractMode09Payload(raw, pid = 0x02) ?: return null
+        val vin = decodeAsciiField(payload)?.filter { it.isLetterOrDigit() }
+            ?: return null
+        return vin.takeIf { it.length in 11..20 }
+    }
+
+    /**
+     * Mode 09 ASCII info (CALID 04, ECU name 0A, etc.): strip `49 <pid> <msg#>` framing.
+     */
+    fun decodeAsciiInfoResponse(raw: String, mode: Int, pid: Int): String? {
+        if (isError(raw)) return null
+        val payload = extractMode09Payload(raw, pid = pid) ?: run {
+            // Some adapters return bare ASCII after the mode/pid header in hex dump form.
+            val bytes = parseHexBytes(raw) ?: return null
+            if (bytes.size < 3) return null
+            if ((bytes[0].toInt() and 0xFF) != mode) return null
+            if ((bytes[1].toInt() and 0xFF) != pid) return null
+            return decodeAsciiField(bytes.copyOfRange(2, bytes.size))
+        }
+        return decodeAsciiField(payload)
+    }
+
+    /**
+     * Collects data bytes after each `49 <pid> <frame>` triplet in a multi-line ELM reply.
+     */
+    private fun extractMode09Payload(raw: String, pid: Int): ByteArray? {
+        val hex = raw.uppercase()
+            .replace(Regex("SEARCHING\\.\\.\\.", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("[^0-9A-F]"), "")
+        if (hex.length < 6 || hex.length % 2 != 0) return null
+        val bytes = ByteArray(hex.length / 2) { i ->
+            hex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+        }
+        val out = ArrayList<Byte>()
+        var i = 0
+        while (i + 2 < bytes.size) {
+            val b0 = bytes[i].toInt() and 0xFF
+            val b1 = bytes[i + 1].toInt() and 0xFF
+            if (b0 == 0x49 && b1 == pid) {
+                // 49 <pid> <msg_count_or_index> <data…>
+                i += 3
+                while (i < bytes.size) {
+                    val next = bytes[i].toInt() and 0xFF
+                    val next1 = if (i + 1 < bytes.size) bytes[i + 1].toInt() and 0xFF else -1
+                    if (next == 0x49 && next1 == pid) break
+                    out.add(bytes[i])
+                    i++
+                }
+            } else {
+                i++
+            }
+        }
+        return if (out.isEmpty()) null else out.toByteArray()
+    }
 }

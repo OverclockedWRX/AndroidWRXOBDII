@@ -149,24 +149,23 @@ fun Tachometer(
         }
     }
 
-    val sideCluster = speedValue != null || speedLimit != null || showGear
-    val baseHeight = when {
-        motionDisplayMode == MotionDisplayMode.TEXT -> if (sideCluster) 112.dp else 120.dp
-        motionVisibility.anyVisible -> if (sideCluster) 124.dp else 136.dp
-        else -> if (sideCluster) 120.dp else 132.dp
+    val showMotion = motion.available && motionVisibility.gForce
+    val sideCluster = speedValue != null || speedLimit != null || showGear || showMotion
+    val rpmValueSp = when {
+        showThrottle && sideCluster -> 26.sp
+        sideCluster -> 30.sp
+        else -> 40.sp
     }
-    // Throttle is deliberately smaller than RPM (numeral + thinner bar).
-    val tachHeight = if (showThrottle) baseHeight + 52.dp else baseHeight
-    val rpmValueSp = if (sideCluster) 34.sp else 48.sp
-    val rpmLabelSp = if (sideCluster) 10.sp else 11.sp
-    val throttleValueSp = if (sideCluster) 20.sp else 26.sp
-    val throttleLabelSp = if (sideCluster) 9.sp else 10.sp
+    val rpmLabelSp = if (sideCluster) 9.sp else 10.sp
+    // Throttle numerals stay smaller; bars use equal weight so track length matches.
+    val throttleValueSp = if (sideCluster) 16.sp else 20.sp
+    val throttleLabelSp = if (sideCluster) 8.sp else 9.sp
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(tachHeight)
-            .padding(horizontal = 8.dp),
+            .fillMaxHeight()
+            .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(
@@ -174,43 +173,28 @@ fun Tachometer(
                 .weight(1f)
                 .fillMaxHeight()
         ) {
-            // Numerals left, pitch/roll/G right — tach bar runs full-width below.
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column {
-                    Text(
-                        text = UnitConverters.formatRpm(if (rpm != null) displayRpm else null),
-                        color = rpmColor,
-                        fontSize = rpmValueSp,
-                        fontWeight = FontWeight.Bold,
-                        fontFamily = FontFamily.Monospace
-                    )
-                    Text(
-                        text = "RPM",
-                        color = HudColors.TextDim,
-                        fontSize = rpmLabelSp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-                if (motion.available && motionVisibility.anyVisible) {
-                    MotionAttitudeDisplay(
-                        motion = motion,
-                        mode = motionDisplayMode,
-                        visibility = motionVisibility,
-                        modifier = Modifier.padding(start = 8.dp, bottom = 2.dp)
-                    )
-                }
-            }
+            Text(
+                text = UnitConverters.formatRpm(if (rpm != null) displayRpm else null),
+                color = rpmColor,
+                fontSize = rpmValueSp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1
+            )
+            Text(
+                text = "RPM",
+                color = HudColors.TextDim,
+                fontSize = rpmLabelSp,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1
+            )
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
 
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (showThrottle) Modifier.height(44.dp) else Modifier.weight(1f))
+                    .weight(1f)
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val fraction = min(displayRpm / maxRpm, 1f)
@@ -308,25 +292,27 @@ fun Tachometer(
             }
 
             if (showThrottle) {
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(2.dp))
                 Text(
                     text = UnitConverters.formatPercent(throttlePercent?.let { displayThrottle }),
                     color = throttleColor,
                     fontSize = throttleValueSp,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1
                 )
                 Text(
                     text = "Throttle",
                     color = HudColors.TextDim,
                     fontSize = throttleLabelSp,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1
                 )
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(1.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(16.dp)
+                        .weight(1f)
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val maxT = 100f
@@ -377,24 +363,47 @@ fun Tachometer(
         if (sideCluster) {
             Row(
                 modifier = Modifier
-                    .padding(start = 8.dp)
+                    .padding(start = 6.dp)
                     .fillMaxHeight(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                if (speedValue != null) {
-                    SpeedTile(
-                        label = "SPD",
-                        value = speedValue,
-                        unit = speedUnit,
-                        compact = true
+                if (speedValue != null || speedLimit != null) {
+                    val stackCount =
+                        (if (speedValue != null) 1 else 0) + (if (speedLimit != null) 1 else 0)
+                    val faceH = TachSideClusterDims.stackedFaceHeight(stackCount)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(TachSideClusterDims.stackGap)
+                    ) {
+                        if (speedValue != null) {
+                            SpeedTile(
+                                label = "SPD",
+                                value = speedValue,
+                                unit = speedUnit,
+                                compact = true,
+                                faceHeight = faceH
+                            )
+                        }
+                        if (speedLimit != null) {
+                            SpeedLimitSign(
+                                reading = speedLimit,
+                                compact = true,
+                                faceHeight = faceH
+                            )
+                        }
+                    }
+                }
+                if (showMotion) {
+                    TachMotionCluster(
+                        motion = motion,
+                        mode = motionDisplayMode,
+                        visibility = motionVisibility
                     )
                 }
-                if (speedLimit != null) {
-                    SpeedLimitSign(reading = speedLimit, compact = true)
-                }
                 if (showGear) {
-                    GearIndicator(gear = gear, compact = true)
+                    // Larger than compact SPD/LIM stack.
+                    GearIndicator(gear = gear, compact = false)
                 }
             }
         }

@@ -3,7 +3,7 @@ package com.wrxhud.obd
 /**
  * Commands this app may send. Enforced at send time by [ObdReadOnlyGuard].
  *
- * Vehicle bus: Mode 01 / 03 / 07 / 0A / UDS 0x22 reads, plus Mode 04 clear-DTCs
+ * Vehicle bus: Mode 01 / 03 / 07 / 09 / 0A / UDS 0x22 reads, plus Mode 04 clear-DTCs
  * only when the user confirms Clear on the Codes settings page.
  * Never: session control, write DID, IO control, routines, memory download.
  */
@@ -37,6 +37,9 @@ object ObdCommands {
 
     /** SAE Mode 01 — show current data (read). */
     fun mode01(pid: Int): String = "01%02X".format(pid)
+
+    /** SAE Mode 09 — vehicle information (VIN, CALID, ECU name) — read. */
+    fun mode09(pid: Int): String = "09%02X".format(pid)
 
     /** UDS ReadDataByIdentifier (service 0x22) — read. */
     fun mode22(did: Int): String = "22%04X".format(did)

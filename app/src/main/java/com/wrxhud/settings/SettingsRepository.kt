@@ -110,7 +110,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.gpsSourceMode] = next.gpsSourceMode.name
             prefs[Keys.bluetoothGpsAddress] = next.bluetoothGpsAddress
             prefs[Keys.showSpeedLimit] = next.showSpeedLimit
-            prefs[Keys.googleMapsApiKey] = next.googleMapsApiKey
+            // Do not persist Maps API keys (unused; exclude from backup surface).
+            prefs[Keys.googleMapsApiKey] = ""
             prefs[Keys.coolantAmber] = next.coolantAmberC
             prefs[Keys.coolantRed] = next.coolantRedC
             prefs[Keys.oilAmber] = next.oilTempAmberC
@@ -139,6 +140,7 @@ class SettingsRepository(private val context: Context) {
                 ?: defaults.enabledGauges,
             enabledLamps = this[Keys.lamps]
                 ?.mapNotNull { runCatching { LampId.valueOf(it) }.getOrNull() }
+                ?.filter { it != LampId.KNOCK && it != LampId.DAM }
                 ?.toSet()
                 ?: defaults.enabledLamps,
             tempUnit = this[Keys.tempUnit]?.let { runCatching { TempUnit.valueOf(it) }.getOrNull() }

@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,9 +51,13 @@ import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
 import com.wrxhud.vehicle.SpeedUnit
 import com.wrxhud.vehicle.TempUnit
+import com.wrxhud.vehicle.VehicleInfo
+import com.wrxhud.vehicle.WrxProfile
+import kotlinx.coroutines.launch
 
 private enum class SettingsTab(val label: String) {
     SOURCE("Source"),
+    VEHICLE("Vehicle Info"),
     LOOK("Look"),
     PIDS("PIDs"),
     PID_LOG("PID Log"),
@@ -69,6 +74,7 @@ private enum class SettingsTab(val label: String) {
 @Composable
 fun SettingsScreen(
     preferences: HudPreferences,
+    vehicleInfo: VehicleInfo = VehicleInfo(),
     onBack: () -> Unit,
     onUpdate: ((HudPreferences) -> HudPreferences) -> Unit,
     onScanPids: suspend () -> List<com.wrxhud.obd.PidScanRow> = { emptyList() },
@@ -76,6 +82,7 @@ fun SettingsScreen(
         com.wrxhud.obd.DtcReadResult(message = "Not connected")
     },
     onClearDtcs: suspend () -> Boolean = { false },
+    onRefreshVehicleInfo: suspend () -> VehicleInfo = { vehicleInfo },
     connectionStatus: String = "",
     onRecalibrateMotion: () -> Unit = {}
 ) {
@@ -166,6 +173,12 @@ fun SettingsScreen(
         ) {
             when (tabs[selectedTab]) {
                 SettingsTab.SOURCE -> SourceTab(preferences, onUpdate)
+                SettingsTab.VEHICLE -> VehicleInfoTab(
+                    preferences = preferences,
+                    vehicleInfo = vehicleInfo,
+                    connectionStatus = connectionStatus,
+                    onRefresh = onRefreshVehicleInfo
+                )
                 SettingsTab.LOOK -> LookTab(preferences, onUpdate, onRecalibrateMotion)
                 SettingsTab.PIDS -> PidScanSection(
                     preferences = preferences,
@@ -254,7 +267,8 @@ private fun SourceTab(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Posted limit from OpenStreetMap Overpass. Untagged roads show N/A.",
+                "Posted limit from OpenStreetMap Overpass. Untagged roads show N/A. " +
+                    "Sends approximate GPS coordinates to public Overpass mirrors over HTTPS.",
                 color = HudColors.TextDim,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
@@ -267,6 +281,107 @@ private fun SourceTab(
         )
     }
     SpeedLimitRequirementWarning()
+}
+
+@Composable
+private fun VehicleInfoTab(
+    preferences: HudPreferences,
+    vehicleInfo: VehicleInfo,
+    connectionStatus: String,
+    onRefresh: suspend () -> VehicleInfo
+) {
+    val scope = rememberCoroutineScope()
+    var busy by remember { mutableStateOf(false) }
+    var localInfo by remember(vehicleInfo) { mutableStateOf(vehicleInfo) }
+
+    SectionTitle("Identity")
+    InfoRow("VIN", localInfo.vin ?: "—")
+    if (localInfo.vinSource != null) {
+        InfoRow("VIN source", localInfo.vinSource!!)
+    }
+    InfoRow("Calibration ID", localInfo.calibrationId ?: "—")
+    InfoRow("ECU name", localInfo.ecuName ?: "—")
+    localInfo.statusMessage?.let { msg ->
+        Text(
+            text = msg,
+            color = HudColors.TextDim,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+
+    SectionTitle("Adapter")
+    InfoRow("Status", connectionStatus.ifBlank { "—" })
+    InfoRow("Adapter", localInfo.adapterId ?: "—")
+    InfoRow("Protocol", localInfo.protocol ?: "—")
+    InfoRow("Voltage (ATRV)", localInfo.adapterVoltage ?: "—")
+
+    SectionTitle("Profile (VB / FA24)")
+    InfoRow("Model years", localInfo.profileModelYears)
+    InfoRow("Engine", localInfo.profileEngine)
+    InfoRow(
+        "Transmission",
+        if (preferences.useSptCvt) WrxProfile.sptCvt.name else WrxProfile.manual6.name
+    )
+    InfoRow(
+        "Tires",
+        "${preferences.tireWidthMm}/${preferences.tireAspect}R${preferences.wheelDiameterIn}"
+    )
+    InfoRow("Oil temp PID", localInfo.oilTempSource ?: "—")
+    InfoRow("MAP / boost PID", localInfo.mapSource ?: "—")
+
+    Button(
+        onClick = {
+            if (busy) return@Button
+            busy = true
+            scope.launch {
+                localInfo = runCatching { onRefresh() }.getOrDefault(localInfo)
+                busy = false
+            }
+        },
+        enabled = !busy && !preferences.useSimulator,
+        colors = ButtonDefaults.buttonColors(containerColor = HudColors.Accent),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Text(
+            if (busy) "Reading…" else "Refresh from OBD",
+            fontFamily = FontFamily.Monospace,
+            fontWeight = FontWeight.Bold
+        )
+    }
+    if (preferences.useSimulator) {
+        Text(
+            "Turn off simulator and connect MX+ to read VIN.",
+            color = HudColors.TextDim,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace
+        )
+    }
+}
+
+@Composable
+private fun InfoRow(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            color = HudColors.TextDim,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            modifier = Modifier.weight(0.4f)
+        )
+        Text(
+            text = value,
+            color = HudColors.TextPrimary,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.weight(0.6f)
+        )
+    }
 }
 
 @Composable
@@ -386,35 +501,20 @@ private fun LookTab(
             )
         }
     }
-    Text(
-        "Show gauges",
-        color = HudColors.TextDim,
-        fontSize = 11.sp,
-        fontFamily = FontFamily.Monospace
+    MotionGaugeToggle(
+        label = "G-force gauge",
+        checked = preferences.showMotionGForce,
+        onCheckedChange = { checked ->
+            onUpdate {
+                it.copy(
+                    showMotionGForce = checked,
+                    showMotionPitch = false,
+                    showMotionRoll = false
+                )
+            }
+        },
+        modifier = Modifier.fillMaxWidth()
     )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        MotionGaugeToggle(
-            label = "Pitch",
-            checked = preferences.showMotionPitch,
-            onCheckedChange = { checked -> onUpdate { it.copy(showMotionPitch = checked) } },
-            modifier = Modifier.weight(1f)
-        )
-        MotionGaugeToggle(
-            label = "Roll",
-            checked = preferences.showMotionRoll,
-            onCheckedChange = { checked -> onUpdate { it.copy(showMotionRoll = checked) } },
-            modifier = Modifier.weight(1f)
-        )
-        MotionGaugeToggle(
-            label = "G-force",
-            checked = preferences.showMotionGForce,
-            onCheckedChange = { checked -> onUpdate { it.copy(showMotionGForce = checked) } },
-            modifier = Modifier.weight(1f)
-        )
-    }
 
     Text(
         if (preferences.motionCalibrated) {
@@ -486,19 +586,21 @@ private fun LampsTab(
         fontSize = 12.sp,
         fontFamily = FontFamily.Monospace
     )
-    LampId.entries.forEach { lamp ->
-        ToggleRow(
-            label = lamp.name.replace('_', ' '),
-            checked = lamp in preferences.enabledLamps,
-            onCheckedChange = { enabled ->
-                onUpdate { prefs ->
-                    val next = prefs.enabledLamps.toMutableSet()
-                    if (enabled) next.add(lamp) else next.remove(lamp)
-                    prefs.copy(enabledLamps = next)
+    LampId.entries
+        .filter { it != LampId.KNOCK && it != LampId.DAM }
+        .forEach { lamp ->
+            ToggleRow(
+                label = lamp.name.replace('_', ' '),
+                checked = lamp in preferences.enabledLamps,
+                onCheckedChange = { enabled ->
+                    onUpdate { prefs ->
+                        val next = prefs.enabledLamps.toMutableSet()
+                        if (enabled) next.add(lamp) else next.remove(lamp)
+                        prefs.copy(enabledLamps = next)
+                    }
                 }
-            }
-        )
-    }
+            )
+        }
 }
 
 @Composable

@@ -390,19 +390,17 @@ private fun AttitudePage(
     }
     Spacer(Modifier.height(8.dp))
     ToggleRow(
-        label = "Show pitch",
-        checked = preferences.showMotionPitch,
-        onCheckedChange = { checked -> onUpdate { it.copy(showMotionPitch = checked) } }
-    )
-    ToggleRow(
-        label = "Show roll",
-        checked = preferences.showMotionRoll,
-        onCheckedChange = { checked -> onUpdate { it.copy(showMotionRoll = checked) } }
-    )
-    ToggleRow(
         label = "Show G-force",
         checked = preferences.showMotionGForce,
-        onCheckedChange = { checked -> onUpdate { it.copy(showMotionGForce = checked) } }
+        onCheckedChange = { checked ->
+            onUpdate {
+                it.copy(
+                    showMotionGForce = checked,
+                    showMotionPitch = false,
+                    showMotionRoll = false
+                )
+            }
+        }
     )
 }
 
@@ -441,19 +439,21 @@ private fun LampsPage(
 ) {
     PageTitle("Warning lamps")
     GaugeIdNote("Choose which warning indicators to show.")
-    LampId.entries.forEach { lamp ->
-        ToggleRow(
-            label = lamp.name.replace('_', ' '),
-            checked = lamp in preferences.enabledLamps,
-            onCheckedChange = { enabled ->
-                onUpdate { prefs ->
-                    val next = prefs.enabledLamps.toMutableSet()
-                    if (enabled) next.add(lamp) else next.remove(lamp)
-                    prefs.copy(enabledLamps = next)
+    LampId.entries
+        .filter { it != LampId.KNOCK && it != LampId.DAM }
+        .forEach { lamp ->
+            ToggleRow(
+                label = lamp.name.replace('_', ' '),
+                checked = lamp in preferences.enabledLamps,
+                onCheckedChange = { enabled ->
+                    onUpdate { prefs ->
+                        val next = prefs.enabledLamps.toMutableSet()
+                        if (enabled) next.add(lamp) else next.remove(lamp)
+                        prefs.copy(enabledLamps = next)
+                    }
                 }
-            }
-        )
-    }
+            )
+        }
 }
 
 @Composable
