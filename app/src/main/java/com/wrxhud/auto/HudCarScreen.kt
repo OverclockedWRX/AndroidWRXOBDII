@@ -66,8 +66,12 @@ class HudCarScreen(carContext: CarContext) : Screen(carContext) {
             addRow("GEAR", UnitConverters.formatGear(snap.gear))
         }
         if (GaugeId.SPEED in prefs.enabledGauges) {
-            val speed = UnitConverters.formatSpeed(snap.gpsSpeedMps, useMph)
-            addRow("SPEED", "$speed ${if (useMph) "MPH" else "KM/H"}")
+            val speedMps = snap.gpsSpeedMps
+                ?: snap.obdSpeedKph?.let { UnitConverters.kphToMps(it) }
+            if (speedMps != null) {
+                val speed = UnitConverters.formatSpeed(speedMps, useMph)
+                addRow("SPD", "$speed ${if (useMph) "MPH" else "KM/H"}")
+            }
         }
         if (GaugeId.BOOST in prefs.enabledGauges) {
             val boostLabel = when {

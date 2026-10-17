@@ -142,6 +142,29 @@ private val EinkScheme = HudColorScheme(
     attitudeInk = Color(0xFFD4D0C4)
 )
 
+/** Subaru / STI inspired — World Rally Blue cockpit with gold accents. */
+private val SubaruScheme = HudColorScheme(
+    background = Color(0xFF070B12),
+    panel = Color(0xFF0F1824),
+    border = Color(0xFF1E3A5F),
+    textPrimary = Color(0xFFE8EEF6),
+    textDim = Color(0xFF7A90A8),
+    accent = Color(0xFFC9A227),
+    boostBlue = Color(0xFF2F6FED),
+    green = Color(0xFF3DDC97),
+    amber = Color(0xFFE8B923),
+    red = Color(0xFFE11D2E),
+    tachTrack = Color(0xFF152033),
+    tachFill = Color(0xFFD6E4F5),
+    lampOff = Color(0xFF1A2838),
+    attitudeRingUpper = Color(0xFF3B82F6),
+    attitudeRingLower = Color(0xFFE8B923),
+    attitudeGlow = Color(0xFF5BA3FF),
+    attitudeHorizon = Color(0xFF7A90A8),
+    attitudeFace = Color(0xFF05080E),
+    attitudeInk = Color(0xFF0A1018)
+)
+
 /** Theme-aware colors for pitch / roll / G-force inclinometer rings. */
 data class AttitudePalette(
     val face: Color,
@@ -159,6 +182,7 @@ object HudColors {
             HudColorTheme.PINKY -> PinkyScheme
             HudColorTheme.NIGHT -> NightScheme
             HudColorTheme.EINK -> EinkScheme
+            HudColorTheme.SUBARU -> SubaruScheme
         }
 
     val Background: Color get() = scheme.background

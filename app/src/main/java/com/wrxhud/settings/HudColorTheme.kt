@@ -7,7 +7,9 @@ enum class HudColorTheme {
     CLASSIC,
     PINKY,
     NIGHT,
-    EINK;
+    EINK,
+    /** Rally blue + STI gold accents on a dark cockpit. */
+    SUBARU;
 
     val label: String
         get() = when (this) {
@@ -15,6 +17,7 @@ enum class HudColorTheme {
             PINKY -> "Pinky"
             NIGHT -> "Night"
             EINK -> "E-ink day"
+            SUBARU -> "Subaru"
         }
 
     companion object {

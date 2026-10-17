@@ -110,9 +110,15 @@ fun HudScreen(
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (GaugeId.SPEED in preferences.enabledGauges) {
+                    val speedMps = snapshot.gpsSpeedMps
+                        ?: snapshot.obdSpeedKph?.let { UnitConverters.kphToMps(it) }
                     SpeedTile(
                         label = "SPD",
-                        value = UnitConverters.formatSpeed(snapshot.gpsSpeedMps, useMph),
+                        value = if (speedMps != null) {
+                            UnitConverters.formatSpeed(speedMps, useMph)
+                        } else {
+                            ""
+                        },
                         unit = if (useMph) "MPH" else "KM/H"
                     )
                 }
