@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wrxhud.gps.SpeedLimitReading
 import com.wrxhud.sensors.MotionReading
 import com.wrxhud.settings.HudPreferences
 import com.wrxhud.vehicle.AlarmEvaluator
@@ -35,6 +36,7 @@ fun HudScreen(
     preferences: HudPreferences,
     connectionStatus: String,
     motion: MotionReading = MotionReading(),
+    speedLimit: SpeedLimitReading = SpeedLimitReading(),
     onOpenSettings: () -> Unit
 ) {
     val thresholds = preferences.toAlarmThresholds()
@@ -102,6 +104,9 @@ fun HudScreen(
                         value = UnitConverters.formatSpeed(snapshot.gpsSpeedMps, useMph),
                         unit = if (useMph) "MPH GPS" else "KM/H GPS"
                     )
+                }
+                if (preferences.showSpeedLimit) {
+                    SpeedLimitSign(reading = speedLimit)
                 }
 
                 Row(

@@ -81,6 +81,10 @@ data class HudPreferences(
     val gpsSourceMode: GpsSourceMode = GpsSourceMode.AUTO,
     /** Optional bonded BT GPS MAC; empty = auto-pick by device name. */
     val bluetoothGpsAddress: String = "",
+    /** Show posted speed-limit sign on the HUD (Google Roads API). */
+    val showSpeedLimit: Boolean = false,
+    /** Google Maps Platform API key with Roads Speed Limits enabled. */
+    val googleMapsApiKey: String = "",
     /** User PID/DID mappings from the scanner; empty = auto discovery defaults. */
     val pidAssignments: List<PidAssignment> = emptyList(),
     val coolantAmberC: Float = 105f,

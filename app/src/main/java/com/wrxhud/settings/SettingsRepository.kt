@@ -49,6 +49,8 @@ class SettingsRepository(private val context: Context) {
         val motionCalibG = floatPreferencesKey("motion_calib_g")
         val gpsSourceMode = stringPreferencesKey("gps_source_mode")
         val bluetoothGpsAddress = stringPreferencesKey("bluetooth_gps_address")
+        val showSpeedLimit = booleanPreferencesKey("show_speed_limit")
+        val googleMapsApiKey = stringPreferencesKey("google_maps_api_key")
         val coolantAmber = floatPreferencesKey("coolant_amber")
         val coolantRed = floatPreferencesKey("coolant_red")
         val oilAmber = floatPreferencesKey("oil_amber")
@@ -94,6 +96,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.motionCalibG] = next.motionCalibGForce
             prefs[Keys.gpsSourceMode] = next.gpsSourceMode.name
             prefs[Keys.bluetoothGpsAddress] = next.bluetoothGpsAddress
+            prefs[Keys.showSpeedLimit] = next.showSpeedLimit
+            prefs[Keys.googleMapsApiKey] = next.googleMapsApiKey
             prefs[Keys.coolantAmber] = next.coolantAmberC
             prefs[Keys.coolantRed] = next.coolantRedC
             prefs[Keys.oilAmber] = next.oilTempAmberC
@@ -157,6 +161,8 @@ class SettingsRepository(private val context: Context) {
                 ?.let { runCatching { GpsSourceMode.valueOf(it) }.getOrNull() }
                 ?: defaults.gpsSourceMode,
             bluetoothGpsAddress = this[Keys.bluetoothGpsAddress] ?: defaults.bluetoothGpsAddress,
+            showSpeedLimit = this[Keys.showSpeedLimit] ?: defaults.showSpeedLimit,
+            googleMapsApiKey = this[Keys.googleMapsApiKey] ?: defaults.googleMapsApiKey,
             coolantAmberC = this[Keys.coolantAmber] ?: defaults.coolantAmberC,
             coolantRedC = this[Keys.coolantRed] ?: defaults.coolantRedC,
             oilTempAmberC = this[Keys.oilAmber] ?: defaults.oilTempAmberC,

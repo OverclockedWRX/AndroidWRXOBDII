@@ -223,6 +223,58 @@ private fun SourceTab(
             )
         }
     }
+
+    SectionTitle("Speed limit")
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+            Text(
+                "Show speed limit",
+                color = if (preferences.showSpeedLimit) HudColors.Accent else HudColors.TextPrimary,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                "Posted limit for the current road via Google Roads API (nearest road + speedLimits).",
+                color = HudColors.TextDim,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                lineHeight = 15.sp
+            )
+        }
+        Switch(
+            checked = preferences.showSpeedLimit,
+            onCheckedChange = { checked -> onUpdate { it.copy(showSpeedLimit = checked) } }
+        )
+    }
+    if (preferences.showSpeedLimit) {
+        Text(
+            "Requires a Maps Platform API key with Roads Speed Limits (Asset Tracking) enabled. Key stays on-device in app settings.",
+            color = HudColors.TextDim,
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            lineHeight = 15.sp
+        )
+        OutlinedTextField(
+            value = preferences.googleMapsApiKey,
+            onValueChange = { value -> onUpdate { it.copy(googleMapsApiKey = value.trim()) } },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+            label = { Text("Google Maps API key", fontFamily = FontFamily.Monospace) },
+            colors = OutlinedTextFieldDefaults.colors(
+                focusedTextColor = HudColors.TextPrimary,
+                unfocusedTextColor = HudColors.TextPrimary,
+                focusedBorderColor = HudColors.Accent,
+                unfocusedBorderColor = HudColors.Border,
+                focusedLabelColor = HudColors.Accent,
+                unfocusedLabelColor = HudColors.TextDim,
+                cursorColor = HudColors.Accent
+            )
+        )
+    }
 }
 
 @Composable

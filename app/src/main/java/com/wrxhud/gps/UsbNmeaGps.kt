@@ -129,6 +129,8 @@ class UsbNmeaGps(
                 val lineBuf = StringBuilder()
                 var speed: Float? = null
                 var hasFix = false
+                var latitude: Double? = null
+                var longitude: Double? = null
                 while (isActive) {
                     val n = serialPort.read(buffer, 500)
                     if (n <= 0) {
@@ -144,11 +146,17 @@ class UsbNmeaGps(
                                 if (update != null) {
                                     update.speedMps?.let { speed = it }
                                     update.hasFix?.let { hasFix = it }
-                                    if (update.speedMps != null || update.hasFix != null) {
+                                    update.latitude?.let { latitude = it }
+                                    update.longitude?.let { longitude = it }
+                                    if (update.speedMps != null || update.hasFix != null ||
+                                        update.latitude != null || update.longitude != null
+                                    ) {
                                         onUpdate(
                                             GpsReading(
                                                 speedMps = speed,
                                                 hasFix = hasFix,
+                                                latitude = latitude,
+                                                longitude = longitude,
                                                 source = GpsSourceKind.USB
                                             )
                                         )

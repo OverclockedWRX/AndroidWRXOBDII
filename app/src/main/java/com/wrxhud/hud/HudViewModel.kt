@@ -9,6 +9,8 @@ import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.wrxhud.gps.GpsSpeedProvider
+import com.wrxhud.gps.SpeedLimitProvider
+import com.wrxhud.gps.SpeedLimitReading
 import com.wrxhud.obd.ObdService
 import com.wrxhud.obd.PidScanRow
 import com.wrxhud.sensors.MotionMountCalibration
@@ -31,6 +33,7 @@ data class HudUiState(
     val preferences: HudPreferences = HudPreferences(),
     val connectionStatus: String = "Idle",
     val motion: MotionReading = MotionReading(),
+    val speedLimit: SpeedLimitReading = SpeedLimitReading(),
     val runtimeStarted: Boolean = false
 )
 
@@ -38,6 +41,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(application)
     private val gps = GpsSpeedProvider(application)
     private val motion = MotionSensorProvider(application)
+    private val speedLimitProvider = SpeedLimitProvider(viewModelScope)
 
     private val _serviceSnapshot = MutableStateFlow(VehicleSnapshot())
     private val _status = MutableStateFlow("Idle")
@@ -74,8 +78,9 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         ) { snap, prefs, status, gpsReading, runtimeStarted ->
             Triple(snap to prefs, status to gpsReading, runtimeStarted)
         },
-        motion.reading
-    ) { core, motionReading ->
+        motion.reading,
+        speedLimitProvider.reading
+    ) { core, motionReading, speedLimit ->
         val (snapPrefs, statusGps, runtimeStarted) = core
         val (snap, prefs) = snapPrefs
         val (status, gpsReading) = statusGps
@@ -124,6 +129,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             preferences = prefs,
             connectionStatus = displayStatus,
             motion = calibratedMotion,
+            speedLimit = speedLimit,
             runtimeStarted = runtimeStarted
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HudUiState())
@@ -133,6 +139,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     private var lastBluetoothGpsAddress: String? = null
 
     init {
+        speedLimitProvider.start(gps.reading, settingsRepository.preferencesFlow)
         viewModelScope.launch {
             settingsRepository.preferencesFlow.collect { prefs ->
                 if (prefs.onboardingComplete) {
@@ -236,6 +243,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     fun isLiveObdConnected(): Boolean = service?.isLiveConnected() == true
 
     override fun onCleared() {
+        speedLimitProvider.stop()
         gps.destroy()
         motion.stop()
         if (bound) {

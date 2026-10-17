@@ -273,29 +273,32 @@ private fun DrawScope.drawInclinometerFace(
     )
 
     // Bias car slightly below center so the degree readout above stays clear.
-    translate(cx, cy + r * 0.10f) {
+    // Pivot at Offset.Zero so tilt/roll spins the silhouette in place (default
+    // rotate() pivot is the canvas center and swung the car out of the ring).
+    val carOrigin = Offset(cx, cy + r * 0.08f)
+    translate(carOrigin.x, carOrigin.y) {
         when (kind) {
             InclinometerKind.PITCH -> {
                 // Screen-remapped pitch: positive = nose up → clockwise for side-view nose-right.
                 val tilt = pitchDeg.coerceIn(-45f, 45f)
-                rotate(degrees = tilt) {
-                    drawWrxVbSide(scale = r * 0.034f)
+                rotate(degrees = tilt, pivot = Offset.Zero) {
+                    drawWrxVbSide(scale = r * 0.052f)
                 }
             }
             InclinometerKind.ROLL -> {
                 // Screen-remapped roll: positive = lean right → clockwise for rear view.
                 val tilt = rollDeg.coerceIn(-45f, 45f)
-                rotate(degrees = tilt) {
-                    drawWrxVbRear(scale = r * 0.034f)
+                rotate(degrees = tilt, pivot = Offset.Zero) {
+                    drawWrxVbRear(scale = r * 0.052f)
                 }
             }
             InclinometerKind.COMBINED -> {
                 val p = pitchDeg.coerceIn(-35f, 35f)
                 val ro = rollDeg.coerceIn(-35f, 35f)
-                rotate(degrees = ro) {
+                rotate(degrees = ro, pivot = Offset.Zero) {
                     val foreshorten = (1f - p / 100f).coerceIn(0.65f, 1.15f)
-                    scale(scaleX = 1f, scaleY = foreshorten) {
-                        drawWrxVbRear(scale = r * 0.028f)
+                    scale(scaleX = 1f, scaleY = foreshorten, pivot = Offset.Zero) {
+                        drawWrxVbRear(scale = r * 0.042f)
                     }
                 }
             }

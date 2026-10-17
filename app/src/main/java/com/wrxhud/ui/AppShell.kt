@@ -40,6 +40,7 @@ fun AppShell(
         preferences = ui.preferences,
         connectionStatus = ui.connectionStatus,
         motion = ui.motion,
+        speedLimit = ui.speedLimit,
         onOpenSettings = { showSettings = true }
     )
 }

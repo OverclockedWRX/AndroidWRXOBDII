@@ -64,16 +64,24 @@ class BluetoothNmeaGps(
                 val reader = BufferedReader(InputStreamReader(sock.inputStream, Charsets.US_ASCII))
                 var speed: Float? = null
                 var hasFix = false
+                var latitude: Double? = null
+                var longitude: Double? = null
                 while (isActive) {
                     val line = reader.readLine() ?: break
                     val update = NmeaParser.parseLine(line) ?: continue
                     update.speedMps?.let { speed = it }
                     update.hasFix?.let { hasFix = it }
-                    if (update.speedMps != null || update.hasFix != null) {
+                    update.latitude?.let { latitude = it }
+                    update.longitude?.let { longitude = it }
+                    if (update.speedMps != null || update.hasFix != null ||
+                        update.latitude != null || update.longitude != null
+                    ) {
                         onUpdate(
                             GpsReading(
                                 speedMps = speed,
                                 hasFix = hasFix,
+                                latitude = latitude,
+                                longitude = longitude,
                                 source = GpsSourceKind.BLUETOOTH
                             )
                         )

@@ -44,6 +44,8 @@ data class GpsReading(
     val speedMps: Float? = null,
     val hasFix: Boolean = false,
     val accuracyM: Float? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
     val source: GpsSourceKind = GpsSourceKind.NONE
 )
 
@@ -173,6 +175,8 @@ class GpsSpeedProvider(private val context: Context) : LocationListener {
             speedMps = speed,
             hasFix = accurate && (speed != null || location.accuracy <= 20f),
             accuracyM = if (location.hasAccuracy()) location.accuracy else null,
+            latitude = location.latitude,
+            longitude = location.longitude,
             source = GpsSourceKind.BUILTIN
         )
         if (mode == GpsSourceMode.BUILTIN || mode == GpsSourceMode.AUTO) {
