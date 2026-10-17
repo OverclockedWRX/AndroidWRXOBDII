@@ -40,11 +40,26 @@ class PidAssignmentTest {
         val kpa = PidValueDecoder.decode(byteArrayOf(0x64), PidDecode.PRESSURE_KPA)
         assertThat(kpa).isWithin(0.1f).of(100f)
 
-        val psi = PidValueDecoder.toSnapshotValue(
+        // Oil pressure switch encoding: 1 = Normal, 0 = Low.
+        val ok = PidValueDecoder.toSnapshotValue(
             MappableSignal.OIL_PRESSURE,
             PidDecode.PRESSURE_KPA,
             100f
         )
-        assertThat(psi).isWithin(0.2f).of(14.5f)
+        assertThat(ok).isWithin(0.01f).of(1f)
+
+        val low = PidValueDecoder.toSnapshotValue(
+            MappableSignal.OIL_PRESSURE,
+            PidDecode.RAW_A,
+            1f
+        )
+        assertThat(low).isWithin(0.01f).of(0f)
+
+        val normalBit = PidValueDecoder.toSnapshotValue(
+            MappableSignal.OIL_PRESSURE,
+            PidDecode.RAW_A,
+            0f
+        )
+        assertThat(normalBit).isWithin(0.01f).of(1f)
     }
 }

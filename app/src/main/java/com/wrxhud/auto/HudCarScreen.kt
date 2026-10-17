@@ -101,10 +101,7 @@ class HudCarScreen(carContext: CarContext) : Screen(carContext) {
             )
         }
         if (GaugeId.OIL_PRESSURE in prefs.enabledGauges) {
-            addRow(
-                "OIL#",
-                "${UnitConverters.formatPressure(snap.oilPressurePsi, prefs.pressureUnit)} ${prefs.pressureUnit.name}"
-            )
+            addRow("OIL#", UnitConverters.formatOilPressureSwitch(snap.oilPressureOk))
         }
         if (GaugeId.INTAKE_AIR_TEMP in prefs.enabledGauges) {
             addRow(

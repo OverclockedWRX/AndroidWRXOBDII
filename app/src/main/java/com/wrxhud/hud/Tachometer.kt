@@ -155,9 +155,12 @@ fun Tachometer(
         motionVisibility.anyVisible -> if (sideCluster) 124.dp else 136.dp
         else -> if (sideCluster) 120.dp else 132.dp
     }
-    val tachHeight = if (showThrottle) baseHeight + 72.dp else baseHeight
-    val valueSp = if (sideCluster) 34.sp else 48.sp
-    val labelSp = if (sideCluster) 10.sp else 11.sp
+    // Throttle is deliberately smaller than RPM (numeral + thinner bar).
+    val tachHeight = if (showThrottle) baseHeight + 52.dp else baseHeight
+    val rpmValueSp = if (sideCluster) 34.sp else 48.sp
+    val rpmLabelSp = if (sideCluster) 10.sp else 11.sp
+    val throttleValueSp = if (sideCluster) 20.sp else 26.sp
+    val throttleLabelSp = if (sideCluster) 9.sp else 10.sp
 
     Row(
         modifier = modifier
@@ -181,14 +184,14 @@ fun Tachometer(
                     Text(
                         text = UnitConverters.formatRpm(if (rpm != null) displayRpm else null),
                         color = rpmColor,
-                        fontSize = valueSp,
+                        fontSize = rpmValueSp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
                         text = "RPM",
                         color = HudColors.TextDim,
-                        fontSize = labelSp,
+                        fontSize = rpmLabelSp,
                         fontFamily = FontFamily.Monospace
                     )
                 }
@@ -207,7 +210,7 @@ fun Tachometer(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
+                    .then(if (showThrottle) Modifier.height(44.dp) else Modifier.weight(1f))
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val fraction = min(displayRpm / maxRpm, 1f)
@@ -305,25 +308,25 @@ fun Tachometer(
             }
 
             if (showThrottle) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(4.dp))
                 Text(
                     text = UnitConverters.formatPercent(throttlePercent?.let { displayThrottle }),
                     color = throttleColor,
-                    fontSize = valueSp,
+                    fontSize = throttleValueSp,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace
                 )
                 Text(
                     text = "Throttle",
                     color = HudColors.TextDim,
-                    fontSize = labelSp,
+                    fontSize = throttleLabelSp,
                     fontFamily = FontFamily.Monospace
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(2.dp))
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(28.dp)
+                        .height(16.dp)
                 ) {
                     Canvas(modifier = Modifier.fillMaxSize()) {
                         val maxT = 100f

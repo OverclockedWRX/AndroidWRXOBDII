@@ -34,6 +34,7 @@ data class HudPreferences(
         GaugeId.GEAR,
         GaugeId.COOLANT,
         GaugeId.OIL_TEMP,
+        GaugeId.OIL_PRESSURE,
         GaugeId.INTAKE_AIR_TEMP,
         GaugeId.BOOST,
         GaugeId.AFR,

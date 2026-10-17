@@ -37,6 +37,13 @@ class StnParserTest {
     }
 
     @Test
+    fun decodeAbsoluteMapKpa_pid87_fromWrxScan() {
+        // Idle scan: 01 87 → 01 04 15 00 00 → sensor A = 0x0415 * 0.03125 ≈ 32.66 kPa
+        val data = StnParser.parseMode01("41 87 01 04 15 00 00", 0x87)!!
+        assertThat(StnParser.decodeAbsoluteMapKpa(data)).isWithin(0.05f).of(32.65625f)
+    }
+
+    @Test
     fun parseMode22() {
         val data = StnParser.parseMode22("62 11 53 6E", 0x1153)!!
         assertThat(data.size).isEqualTo(1)

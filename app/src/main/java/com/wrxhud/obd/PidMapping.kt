@@ -6,7 +6,7 @@ import com.wrxhud.vehicle.WrxProfile
 /** User-assignable HUD signals that can be bound to a scanned PID/DID. */
 enum class MappableSignal(val label: String) {
     OIL_TEMP("Oil temp"),
-    OIL_PRESSURE("Oil pressure"),
+    OIL_PRESSURE("Oil pressure (switch)"),
     AFR("AFR"),
     COOLANT("Coolant"),
     IAT("IAT"),
@@ -80,9 +80,19 @@ object PidValueDecoder {
     /** Convert a decoded raw value into the unit stored on [com.wrxhud.vehicle.VehicleSnapshot]. */
     fun toSnapshotValue(signal: MappableSignal, formula: PidDecode, decoded: Float): Float {
         return when (signal) {
+            // Oil pressure is a switch: store 1 = Normal, 0 = Low for the poller.
             MappableSignal.OIL_PRESSURE -> when (formula) {
-                PidDecode.PRESSURE_KPA -> UnitConverters.kpaToPsi(decoded)
-                else -> decoded
+                PidDecode.PRESSURE_KPA -> {
+                    val psi = UnitConverters.kpaToPsi(decoded)
+                    if (psi > 10f) 1f else 0f
+                }
+                // Warning-lamp style bit: 0 = Normal, non-zero = Low.
+                // PSI-like raw (>5) means pressure present → Normal.
+                else -> when {
+                    decoded > 5f -> 1f
+                    decoded < 0.5f -> 1f
+                    else -> 0f
+                }
             }
             MappableSignal.BOOST_MAP -> decoded // MAP kPa; poller applies baro
             else -> decoded

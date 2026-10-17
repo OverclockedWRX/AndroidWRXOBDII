@@ -14,9 +14,7 @@ object AlarmEvaluator {
             highIat = snapshot.intakeAirTempC?.let { it >= thresholds.iatAmberC } == true,
             overboost = snapshot.boostPsi?.let { it >= thresholds.boostAmberPsi } == true,
             lowBattery = snapshot.batteryVolts?.let { it > 0f && it < thresholds.lowBatteryVolts } == true,
-            lowOilPressure = snapshot.oilPressurePsi?.let {
-                it > 0f && it <= thresholds.oilPressureAmberPsi
-            } == true,
+            lowOilPressure = snapshot.oilPressureOk == false,
             linkLost = expectObd && !snapshot.obdConnected && !snapshot.usingSimulator,
             gpsLost = !snapshot.gpsHasFix,
             knock = snapshot.knockActive == true,
@@ -69,13 +67,11 @@ object AlarmEvaluator {
         }
     }
 
-    fun severityForOilPressure(psi: Float?, thresholds: WrxProfile.AlarmThresholds): Severity {
-        if (psi == null) return Severity.NONE
-        return when {
-            psi <= thresholds.oilPressureRedPsi -> Severity.CRITICAL
-            psi <= thresholds.oilPressureAmberPsi -> Severity.WARN
-            else -> Severity.NORMAL
-        }
+    /** Oil pressure is a binary switch on stock VB FA24. */
+    fun severityForOilPressure(ok: Boolean?): Severity = when (ok) {
+        null -> Severity.NONE
+        true -> Severity.NORMAL
+        false -> Severity.CRITICAL
     }
 
     enum class Severity { NONE, NORMAL, WARN, CRITICAL }

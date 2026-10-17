@@ -55,13 +55,14 @@ class ObdPoller(
     private val supportedPids = mutableSetOf<Int>()
     private var mapKpa: Float? = null
     private var baroKpa: Float? = null
-    private var oilTempMode22Did: Int? = null
-    private var useMode01OilTemp: Boolean = false
-    private var oilTempSourceLabel: String = "none"
+    /** VB FA24 confirmed: SAE Mode 01 PID 0x5C (hard-coded; no Mode 22 hunt). */
+    private var oilTempSourceLabel: String = "01 5C"
     private var iatMode22Did: Int? = null
     private var useMode01Iat: Boolean = false
     private var mapMode22Did: Int? = null
     private var useMode01Map: Boolean = false
+    /** Mode 01 MAP PID in use: [WrxProfile.Pid.MAP] (0x0B) or [WrxProfile.Pid.MAP_ABS] (0x87). */
+    private var mapMode01Pid: Int = WrxProfile.Pid.MAP
 
     private data class SlowPid(
         val name: String,
@@ -141,10 +142,18 @@ class ObdPoller(
         Log.i(TAG, "Supported PIDs: $supportedPids")
 
         if (assignment(MappableSignal.OIL_TEMP) == null) {
-            discoverOilTemp()
+            // Confirmed on this car: always Mode 01 PID 5C.
+            oilTempSourceLabel = "01 5C"
+            pollMode01(WrxProfile.Pid.OIL_TEMP) { data ->
+                val temp = StnParser.decodeTempC(data)
+                if (temp != null && temp in -20f..160f) {
+                    _snapshot.update {
+                        it.copy(oilTempC = temp, oilTempSource = oilTempSourceLabel)
+                    }
+                    Log.i(TAG, "Oil temp via hard-coded 01 5C = $temp C")
+                }
+            }
         } else {
-            useMode01OilTemp = false
-            oilTempMode22Did = null
             oilTempSourceLabel = "user"
         }
         if (assignment(MappableSignal.IAT) == null) {
@@ -163,50 +172,6 @@ class ObdPoller(
 
     private fun assignment(signal: MappableSignal): PidAssignment? =
         assignmentsProvider().firstOrNull { it.signal == signal }
-
-    /**
-     * Confirm oil temp by trying known sources and accepting the first plausible reading.
-     * Order: SAE 01 5C → Mode 22 candidates under 7E0.
-     */
-    private fun discoverOilTemp() {
-        useMode01OilTemp = false
-        oilTempMode22Did = null
-        oilTempSourceLabel = "none"
-
-        val tryMode01 = supportedPids.contains(WrxProfile.Pid.OIL_TEMP) || supportedPids.isEmpty()
-        if (tryMode01) {
-            val raw = connection.sendCommand(ObdCommands.mode01(WrxProfile.Pid.OIL_TEMP))
-            val data = StnParser.parseMode01(raw, WrxProfile.Pid.OIL_TEMP)
-            val temp = data?.let { StnParser.decodeTempC(it) }
-            if (temp != null && temp in -20f..160f) {
-                useMode01OilTemp = true
-                oilTempSourceLabel = "01 5C"
-                _snapshot.update { it.copy(oilTempC = temp, oilTempSource = oilTempSourceLabel) }
-                Log.i(TAG, "Oil temp confirmed via Mode 01 PID 5C = $temp C")
-                return
-            }
-        }
-
-        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
-        for (candidate in WrxProfile.oilTempCandidates) {
-            val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
-            Log.i(TAG, "Oil temp probe 22 ${"%04X".format(candidate.did)} -> ${StnParser.normalize(raw)}")
-            val data = StnParser.parseMode22(raw, candidate.did) ?: continue
-            val value = candidate.scale(data) ?: continue
-            if (!candidate.plausible(value)) continue
-            oilTempMode22Did = candidate.did
-            oilTempSourceLabel = "22 ${"%04X".format(candidate.did)}"
-            _snapshot.update { it.copy(oilTempC = value, oilTempSource = oilTempSourceLabel) }
-            Log.i(TAG, "Oil temp confirmed via $oilTempSourceLabel = $value C")
-            break
-        }
-        connection.sendCommand("ATSH7DF")
-
-        if (oilTempMode22Did == null && !useMode01OilTemp) {
-            Log.w(TAG, "Oil temp: no DID confirmed (ECU did not return a plausible value)")
-            _snapshot.update { it.copy(oilTempSource = "none") }
-        }
-    }
 
     /** SAE 01 0F when supported; else first plausible Mode 22 IAT candidate (read-only). */
     private fun discoverIat() {
@@ -241,23 +206,47 @@ class ObdPoller(
         }
     }
 
-    /** SAE 01 0B when supported; else first plausible Mode 22 MAP candidate (read-only). */
+    /**
+     * MAP for boost/vac: SAE 01 0B → SAE 01 87 (absolute MAP, used on VB FA24) → Mode 22.
+     */
     private fun discoverMap() {
         useMode01Map = false
         mapMode22Did = null
-        val tryMode01 = supportedPids.contains(WrxProfile.Pid.MAP) || supportedPids.isEmpty()
-        if (tryMode01) {
+        mapMode01Pid = WrxProfile.Pid.MAP
+
+        val try0b = supportedPids.contains(WrxProfile.Pid.MAP) || supportedPids.isEmpty()
+        if (try0b) {
             val raw = connection.sendCommand(ObdCommands.mode01(WrxProfile.Pid.MAP))
             val data = StnParser.parseMode01(raw, WrxProfile.Pid.MAP)
             val kpa = data?.let { StnParser.decodePressureKpa(it) }
             if (kpa != null && kpa in 15f..320f) {
                 useMode01Map = true
+                mapMode01Pid = WrxProfile.Pid.MAP
                 mapKpa = kpa
                 updateBoost()
                 Log.i(TAG, "MAP confirmed via Mode 01 PID 0B = $kpa kPa")
                 return
             }
         }
+
+        // VB FA24 scan: 01 0B absent, but 01 87 replies with absolute MAP (~33 kPa at idle).
+        val try87 = supportedPids.contains(WrxProfile.Pid.MAP_ABS) ||
+            supportedPids.isEmpty() ||
+            !supportedPids.contains(WrxProfile.Pid.MAP)
+        if (try87) {
+            val raw = connection.sendCommand(ObdCommands.mode01(WrxProfile.Pid.MAP_ABS))
+            val data = StnParser.parseMode01(raw, WrxProfile.Pid.MAP_ABS)
+            val kpa = data?.let { StnParser.decodeAbsoluteMapKpa(it) }
+            if (kpa != null && kpa in 15f..320f) {
+                useMode01Map = true
+                mapMode01Pid = WrxProfile.Pid.MAP_ABS
+                mapKpa = kpa
+                updateBoost()
+                Log.i(TAG, "MAP confirmed via Mode 01 PID 87 = $kpa kPa")
+                return
+            }
+        }
+
         connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
         for (candidate in WrxProfile.mapCandidates) {
             val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
@@ -328,8 +317,12 @@ class ObdPoller(
             }
         } else if (useMode01Map) {
             list += SlowPid("map") {
-                pollMode01(WrxProfile.Pid.MAP) { data ->
-                    mapKpa = StnParser.decodePressureKpa(data)
+                pollMode01(mapMode01Pid) { data ->
+                    mapKpa = if (mapMode01Pid == WrxProfile.Pid.MAP_ABS) {
+                        StnParser.decodeAbsoluteMapKpa(data)
+                    } else {
+                        StnParser.decodePressureKpa(data)
+                    }
                     updateBoost()
                 }
             }
@@ -432,27 +425,14 @@ class ObdPoller(
                     it.copy(oilTempC = v, oilTempSource = "user")
                 }
             }
-        } else if (useMode01OilTemp) {
+        } else {
+            // Hard-coded SAE 01 5C for VB FA24 oil temperature.
             list += SlowPid("oilTemp") {
                 pollMode01(WrxProfile.Pid.OIL_TEMP) { data ->
                     val temp = StnParser.decodeTempC(data)
                     if (temp != null && temp in -20f..160f) {
                         _snapshot.update {
-                            it.copy(oilTempC = temp, oilTempSource = oilTempSourceLabel)
-                        }
-                    }
-                }
-            }
-        } else {
-            oilTempMode22Did?.let { did ->
-                list += SlowPid("oilTemp") {
-                    pollMode22(did) { data ->
-                        val candidate = WrxProfile.oilTempCandidates.first { it.did == did }
-                        val value = candidate.scale(data)
-                        if (value != null && candidate.plausible(value)) {
-                            _snapshot.update {
-                                it.copy(oilTempC = value, oilTempSource = oilTempSourceLabel)
-                            }
+                            it.copy(oilTempC = temp, oilTempSource = "01 5C")
                         }
                     }
                 }
@@ -461,7 +441,8 @@ class ObdPoller(
 
         if (assignment(MappableSignal.OIL_PRESSURE) != null) {
             addAssigned(MappableSignal.OIL_PRESSURE, "oilPressure") { v ->
-                _snapshot.update { it.copy(oilPressurePsi = v) }
+                // Decoder stores 1 = Normal, 0 = Low.
+                _snapshot.update { it.copy(oilPressureOk = v >= 0.5f) }
             }
         }
 

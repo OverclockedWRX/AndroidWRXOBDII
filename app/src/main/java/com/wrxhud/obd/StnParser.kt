@@ -82,6 +82,22 @@ object StnParser {
         return (data[0].toInt() and 0xFF).toFloat()
     }
 
+    /**
+     * SAE Mode 01 PID 0x87 — Absolute Intake Manifold Pressure.
+     * A = supported-sensor bitmask; each present sensor is 2 bytes × 0.03125 kPa.
+     * Returns sensor A when bit 0 is set (typical single-MAP layout).
+     */
+    fun decodeAbsoluteMapKpa(data: ByteArray): Float? {
+        if (data.size < 3) return null
+        val support = data[0].toInt() and 0xFF
+        if (support and 0x01 == 0) return null
+        val a = data[1].toInt() and 0xFF
+        val b = data[2].toInt() and 0xFF
+        val kpa = ((a * 256) + b) * 0.03125f
+        if (kpa !in 5f..350f) return null
+        return kpa
+    }
+
     fun decodeVoltage(data: ByteArray): Float? {
         if (data.size < 2) return null
         val a = data[0].toInt() and 0xFF

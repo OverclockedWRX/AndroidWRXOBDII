@@ -56,7 +56,14 @@ object UnitConverters {
 
     fun formatPercent(percent: Float?): String {
         if (percent == null) return "—"
-        return "%.0f".format(percent.coerceIn(0f, 100f))
+        return "%.0f%%".format(percent.coerceIn(0f, 100f))
+    }
+
+    /** Stock oil-pressure switch: Normal / Low (not PSI). */
+    fun formatOilPressureSwitch(ok: Boolean?): String = when (ok) {
+        true -> "Normal"
+        false -> "Low"
+        null -> "—"
     }
 
     fun formatGear(gear: Int?): String = when (gear) {

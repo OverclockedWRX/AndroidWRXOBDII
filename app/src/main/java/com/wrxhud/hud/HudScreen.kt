@@ -157,15 +157,9 @@ fun HudScreen(
                     if (GaugeId.OIL_PRESSURE in preferences.enabledGauges) {
                         GaugeTile(
                             label = "OIL#",
-                            valueText = UnitConverters.formatPressure(
-                                snapshot.oilPressurePsi,
-                                preferences.pressureUnit
-                            ),
-                            unit = preferences.pressureUnit.name,
-                            severity = AlarmEvaluator.severityForOilPressure(
-                                snapshot.oilPressurePsi,
-                                thresholds
-                            ),
+                            valueText = UnitConverters.formatOilPressureSwitch(snapshot.oilPressureOk),
+                            unit = "SW",
+                            severity = AlarmEvaluator.severityForOilPressure(snapshot.oilPressureOk),
                             modifier = Modifier.weight(1f)
                         )
                     }

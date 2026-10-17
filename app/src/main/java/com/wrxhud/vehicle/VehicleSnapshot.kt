@@ -21,8 +21,11 @@ data class VehicleSnapshot(
     val boostPsi: Float? = null,
     /** Gasoline AFR from λ × 14.7 (wideband / commanded eq ratio). */
     val afr: Float? = null,
-    /** Engine oil pressure (psi), from user-mapped PID/DID when available. */
-    val oilPressurePsi: Float? = null,
+    /**
+     * Oil pressure warning switch (stock VB has no PSI sender over OBD).
+     * true = Normal, false = Low, null = no reading yet.
+     */
+    val oilPressureOk: Boolean? = null,
     val batteryVolts: Float? = null,
     val fuelLevelPercent: Float? = null,
     /** Absolute throttle plate position (%), Mode 01 PID 0x11. */

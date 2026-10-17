@@ -3,8 +3,8 @@ package com.wrxhud.vehicle
 /**
  * 2022–present Subaru WRX (VB / FA24) vehicle profile.
  *
- * Oil temp: try SAE Mode 01 PID 0x5C first, then Mode 22 candidates under header 7E0.
- * A candidate is accepted for the session when the ECU returns a plausible temperature.
+ * Oil temp: hard-coded SAE Mode 01 PID 0x5C (confirmed on VB FA24).
+ * Oil pressure: stock sender is switch-only (Normal/Low); no PSI over OBD.
  */
 object WrxProfile {
     const val MODEL_YEARS = "2022–present"
@@ -254,6 +254,11 @@ object WrxProfile {
         const val COMMANDED_EQ_RATIO = 0x44
         /** Accelerator pedal position D — driver demand (%). */
         const val ACCEL_PEDAL_D = 0x49
+        /**
+         * Absolute intake manifold pressure (wide-range MAP).
+         * Used on VB FA24 when classic PID 0x0B is absent.
+         */
+        const val MAP_ABS = 0x87
     }
 
     /** Gasoline stoichiometric AFR used to convert λ → AFR. */
