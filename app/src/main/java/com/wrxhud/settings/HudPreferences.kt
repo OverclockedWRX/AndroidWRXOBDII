@@ -69,8 +69,12 @@ data class HudPreferences(
     val dangerToManifold: Boolean = false,
     /** Extruded / beveled 3D look for the RPM bar tach. */
     val rpmGauge3d: Boolean = false,
-    /** How pitch / roll / yaw are shown next to the tach. */
+    /** How pitch / roll / G are shown next to the tach. */
     val motionDisplayMode: MotionDisplayMode = MotionDisplayMode.RINGS,
+    /** Which motion gauges appear (text strip / rings / combined side metrics). */
+    val showMotionPitch: Boolean = true,
+    val showMotionRoll: Boolean = true,
+    val showMotionGForce: Boolean = true,
     /** True after the user completes the in-car mount accelerometer test. */
     val motionCalibrated: Boolean = false,
     val motionCalibPitchDeg: Float = 0f,

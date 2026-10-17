@@ -50,6 +50,7 @@ fun Tachometer(
     gear: Int?,
     motion: MotionReading = MotionReading(),
     motionDisplayMode: MotionDisplayMode = MotionDisplayMode.RINGS,
+    motionVisibility: MotionGaugeVisibility = MotionGaugeVisibility(),
     threeDimensional: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -124,10 +125,11 @@ fun Tachometer(
                         fontFamily = FontFamily.Monospace
                     )
                 }
-                if (motion.available) {
+                if (motion.available && motionVisibility.anyVisible) {
                     MotionAttitudeDisplay(
                         motion = motion,
                         mode = motionDisplayMode,
+                        visibility = motionVisibility,
                         modifier = Modifier.padding(bottom = 2.dp)
                     )
                 }

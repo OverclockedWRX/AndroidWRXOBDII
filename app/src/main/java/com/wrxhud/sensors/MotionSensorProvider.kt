@@ -24,6 +24,10 @@ data class MotionReading(
      * This is how many extra Gs the car is pulling, not total including 1g gravity.
      */
     val gForce: Float? = null,
+    /** Screen-frame lateral G (+ = right). */
+    val lateralG: Float? = null,
+    /** Screen-frame longitudinal G (+ = forward / up on the G gauge). */
+    val longitudinalG: Float? = null,
     val available: Boolean = false
 )
 
@@ -59,6 +63,8 @@ class MotionSensorProvider(context: Context) : SensorEventListener {
     private val remappedRotationMatrix = FloatArray(9)
     private val orientation = FloatArray(3)
     private var latestG: Float? = null
+    private var latestLateralG: Float? = null
+    private var latestLongitudinalG: Float? = null
     private var latestPitch: Float? = null
     private var latestRoll: Float? = null
     private var latestYaw: Float? = null
@@ -87,19 +93,22 @@ class MotionSensorProvider(context: Context) : SensorEventListener {
         try {
             when (event.sensor.type) {
                 Sensor.TYPE_LINEAR_ACCELERATION -> {
-                    val ax = event.values[0]
-                    val ay = event.values[1]
-                    val az = event.values[2]
-                    latestG = sqrt(ax * ax + ay * ay + az * az) / SensorManager.GRAVITY_EARTH
+                    publishAccelG(
+                        event.values[0],
+                        event.values[1],
+                        event.values[2],
+                        stripGravityBaseline = false
+                    )
                 }
                 Sensor.TYPE_ACCELEROMETER -> {
                     // Fallback only when linear acceleration is unavailable: strip ~1g baseline.
                     if (linearAccel == null) {
-                        val ax = event.values[0]
-                        val ay = event.values[1]
-                        val az = event.values[2]
-                        val totalG = sqrt(ax * ax + ay * ay + az * az) / SensorManager.GRAVITY_EARTH
-                        latestG = (totalG - 1f).coerceAtLeast(0f)
+                        publishAccelG(
+                            event.values[0],
+                            event.values[1],
+                            event.values[2],
+                            stripGravityBaseline = true
+                        )
                     }
                 }
                 Sensor.TYPE_ROTATION_VECTOR, Sensor.TYPE_GAME_ROTATION_VECTOR -> {
@@ -152,12 +161,36 @@ class MotionSensorProvider(context: Context) : SensorEventListener {
         }.getOrNull() ?: Surface.ROTATION_0
     }
 
+    private fun publishAccelG(ax: Float, ay: Float, az: Float, stripGravityBaseline: Boolean) {
+        val (sx, sy) = remapAccelToScreen(ax, ay)
+        val g = SensorManager.GRAVITY_EARTH
+        var mag = sqrt(ax * ax + ay * ay + az * az) / g
+        if (stripGravityBaseline) mag = (mag - 1f).coerceAtLeast(0f)
+        latestG = mag
+        latestLateralG = sx / g
+        // Screen +Y is toward the top of the HUD; treat that as forward accel on the G plot.
+        latestLongitudinalG = -sy / g
+    }
+
+    /** Remap device X/Y accel into the current screen orientation (same axes as pitch/roll). */
+    private fun remapAccelToScreen(ax: Float, ay: Float): Pair<Float, Float> {
+        return when (currentDisplayRotation()) {
+            Surface.ROTATION_0 -> ax to ay
+            Surface.ROTATION_90 -> ay to -ax
+            Surface.ROTATION_180 -> -ax to -ay
+            Surface.ROTATION_270 -> -ay to ax
+            else -> ax to ay
+        }
+    }
+
     private fun publish() {
         _reading.value = MotionReading(
             pitchDeg = latestPitch,
             rollDeg = latestRoll,
             yawDeg = latestYaw,
             gForce = latestG,
+            lateralG = latestLateralG,
+            longitudinalG = latestLongitudinalG,
             available = rotationSensor != null || linearAccel != null || accelerometer != null
         )
     }

@@ -42,6 +42,9 @@ class SettingsRepository(private val context: Context) {
         val dangerToManifold = booleanPreferencesKey("danger_to_manifold")
         val rpmGauge3d = booleanPreferencesKey("rpm_gauge_3d")
         val motionDisplayMode = stringPreferencesKey("motion_display_mode")
+        val showMotionPitch = booleanPreferencesKey("show_motion_pitch")
+        val showMotionRoll = booleanPreferencesKey("show_motion_roll")
+        val showMotionGForce = booleanPreferencesKey("show_motion_gforce")
         val motionCalibrated = booleanPreferencesKey("motion_calibrated")
         val motionCalibPitch = floatPreferencesKey("motion_calib_pitch")
         val motionCalibRoll = floatPreferencesKey("motion_calib_roll")
@@ -89,6 +92,9 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.dangerToManifold] = next.dangerToManifold
             prefs[Keys.rpmGauge3d] = next.rpmGauge3d
             prefs[Keys.motionDisplayMode] = next.motionDisplayMode.name
+            prefs[Keys.showMotionPitch] = next.showMotionPitch
+            prefs[Keys.showMotionRoll] = next.showMotionRoll
+            prefs[Keys.showMotionGForce] = next.showMotionGForce
             prefs[Keys.motionCalibrated] = next.motionCalibrated
             prefs[Keys.motionCalibPitch] = next.motionCalibPitchDeg
             prefs[Keys.motionCalibRoll] = next.motionCalibRollDeg
@@ -152,6 +158,9 @@ class SettingsRepository(private val context: Context) {
             rpmGauge3d = this[Keys.rpmGauge3d] ?: defaults.rpmGauge3d,
             motionDisplayMode = MotionDisplayMode.fromStored(this[Keys.motionDisplayMode])
                 ?: defaults.motionDisplayMode,
+            showMotionPitch = this[Keys.showMotionPitch] ?: defaults.showMotionPitch,
+            showMotionRoll = this[Keys.showMotionRoll] ?: defaults.showMotionRoll,
+            showMotionGForce = this[Keys.showMotionGForce] ?: defaults.showMotionGForce,
             motionCalibrated = this[Keys.motionCalibrated] ?: defaults.motionCalibrated,
             motionCalibPitchDeg = this[Keys.motionCalibPitch] ?: defaults.motionCalibPitchDeg,
             motionCalibRollDeg = this[Keys.motionCalibRoll] ?: defaults.motionCalibRollDeg,

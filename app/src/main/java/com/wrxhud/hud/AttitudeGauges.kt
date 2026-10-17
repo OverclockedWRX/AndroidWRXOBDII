@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +39,7 @@ import com.wrxhud.sensors.MotionReading
 import com.wrxhud.sensors.formatGForce
 import com.wrxhud.sensors.formatSignedDegrees
 import com.wrxhud.settings.MotionDisplayMode
+import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -45,26 +49,48 @@ private val RingCyan = Color(0xFF00E5FF)
 private val CarGlow = Color(0xFFE8FF4A)
 private val HorizonLine = Color(0xFF94A3B8)
 
+data class MotionGaugeVisibility(
+    val pitch: Boolean = true,
+    val roll: Boolean = true,
+    val gForce: Boolean = true
+) {
+    val anyVisible: Boolean get() = pitch || roll || gForce
+}
+
 /**
- * Pitch / roll attitude — text strip, dual WRX rings, or one combined ring.
- * Yaw is not shown.
+ * Pitch / roll / G — text strip, WRX rings (+ G ring), or combined attitude.
  */
 @Composable
 fun MotionAttitudeDisplay(
     motion: MotionReading,
     mode: MotionDisplayMode,
+    visibility: MotionGaugeVisibility = MotionGaugeVisibility(),
     modifier: Modifier = Modifier
 ) {
+    if (!visibility.anyVisible) return
     when (mode) {
-        MotionDisplayMode.TEXT -> MotionTelemetryStrip(motion = motion, modifier = modifier)
-        MotionDisplayMode.RINGS -> DualAttitudeRings(motion = motion, modifier = modifier)
-        MotionDisplayMode.COMBINED -> CombinedAttitudeRing(motion = motion, modifier = modifier)
+        MotionDisplayMode.TEXT -> MotionTelemetryStrip(
+            motion = motion,
+            visibility = visibility,
+            modifier = modifier
+        )
+        MotionDisplayMode.RINGS -> DualAttitudeRings(
+            motion = motion,
+            visibility = visibility,
+            modifier = modifier
+        )
+        MotionDisplayMode.COMBINED -> CombinedAttitudeRing(
+            motion = motion,
+            visibility = visibility,
+            modifier = modifier
+        )
     }
 }
 
 @Composable
 fun MotionTelemetryStrip(
     motion: MotionReading,
+    visibility: MotionGaugeVisibility = MotionGaugeVisibility(),
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(6.dp)
@@ -77,9 +103,9 @@ fun MotionTelemetryStrip(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MotionCell("PIT", formatSignedDegrees(motion.pitchDeg))
-        MotionCell("ROL", formatSignedDegrees(motion.rollDeg))
-        MotionCell("G", formatGForce(motion.gForce))
+        if (visibility.pitch) MotionCell("PIT", formatSignedDegrees(motion.pitchDeg))
+        if (visibility.roll) MotionCell("ROL", formatSignedDegrees(motion.rollDeg))
+        if (visibility.gForce) MotionCell("G", formatGForce(motion.gForce))
     }
 }
 
@@ -106,6 +132,7 @@ private fun MotionCell(label: String, value: String) {
 @Composable
 private fun DualAttitudeRings(
     motion: MotionReading,
+    visibility: MotionGaugeVisibility,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(8.dp)
@@ -118,29 +145,26 @@ private fun DualAttitudeRings(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        InclinometerGauge(
-            label = "Pitch",
-            degrees = motion.pitchDeg,
-            kind = InclinometerKind.PITCH,
-            size = 88.dp
-        )
-        InclinometerGauge(
-            label = "Roll",
-            degrees = motion.rollDeg,
-            kind = InclinometerKind.ROLL,
-            size = 88.dp
-        )
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(start = 2.dp, bottom = 4.dp)
-        ) {
-            Text("G", color = HudColors.TextDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-            Text(
-                formatGForce(motion.gForce),
-                color = HudColors.TextPrimary,
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
+        if (visibility.pitch) {
+            InclinometerGauge(
+                label = "Pitch",
+                degrees = motion.pitchDeg,
+                kind = InclinometerKind.PITCH,
+                size = 88.dp
+            )
+        }
+        if (visibility.roll) {
+            InclinometerGauge(
+                label = "Roll",
+                degrees = motion.rollDeg,
+                kind = InclinometerKind.ROLL,
+                size = 88.dp
+            )
+        }
+        if (visibility.gForce) {
+            GForceGauge(
+                motion = motion,
+                size = 88.dp
             )
         }
     }
@@ -149,6 +173,7 @@ private fun DualAttitudeRings(
 @Composable
 private fun CombinedAttitudeRing(
     motion: MotionReading,
+    visibility: MotionGaugeVisibility,
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(8.dp)
@@ -161,21 +186,173 @@ private fun CombinedAttitudeRing(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        InclinometerGauge(
-            label = "Attitude",
-            degrees = motion.pitchDeg,
-            secondaryDegrees = motion.rollDeg,
-            kind = InclinometerKind.COMBINED,
-            size = 96.dp
-        )
-        Column(
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-            modifier = Modifier.padding(bottom = 4.dp)
-        ) {
-            TinyMetric("Pitch", formatSignedDegrees(motion.pitchDeg))
-            TinyMetric("Roll", formatSignedDegrees(motion.rollDeg))
-            TinyMetric("G", formatGForce(motion.gForce))
+        when {
+            visibility.pitch && visibility.roll -> {
+                InclinometerGauge(
+                    label = "Attitude",
+                    degrees = motion.pitchDeg,
+                    secondaryDegrees = motion.rollDeg,
+                    kind = InclinometerKind.COMBINED,
+                    size = 96.dp
+                )
+            }
+            visibility.pitch -> {
+                InclinometerGauge(
+                    label = "Pitch",
+                    degrees = motion.pitchDeg,
+                    kind = InclinometerKind.PITCH,
+                    size = 88.dp
+                )
+            }
+            visibility.roll -> {
+                InclinometerGauge(
+                    label = "Roll",
+                    degrees = motion.rollDeg,
+                    kind = InclinometerKind.ROLL,
+                    size = 88.dp
+                )
+            }
         }
+        if (visibility.gForce) {
+            GForceGauge(motion = motion, size = 88.dp)
+        }
+        if (visibility.pitch || visibility.roll) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+                modifier = Modifier.padding(bottom = 4.dp)
+            ) {
+                if (visibility.pitch) TinyMetric("Pitch", formatSignedDegrees(motion.pitchDeg))
+                if (visibility.roll) TinyMetric("Roll", formatSignedDegrees(motion.rollDeg))
+            }
+        }
+    }
+}
+
+private const val G_TRAIL_MAX = 56
+private const val G_FULL_SCALE = 1.5f
+
+@Composable
+private fun GForceGauge(
+    motion: MotionReading,
+    size: Dp
+) {
+    val trail = remember { mutableStateListOf<Offset>() }
+    val lat = motion.lateralG
+    val lon = motion.longitudinalG
+    SideEffect {
+        if (lat != null && lon != null) {
+            val next = Offset(lat, lon)
+            val prev = trail.lastOrNull()
+            if (prev == null || hypot((prev.x - next.x).toDouble(), (prev.y - next.y).toDouble()) > 0.008) {
+                trail.add(next)
+                while (trail.size > G_TRAIL_MAX) trail.removeAt(0)
+            }
+        }
+    }
+    val trailSnapshot = trail.toList()
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "G",
+            color = HudColors.TextDim,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = FontFamily.Monospace
+        )
+        Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawGForceFace(
+                    lateralG = lat ?: 0f,
+                    longitudinalG = lon ?: 0f,
+                    hasSample = lat != null && lon != null,
+                    trail = trailSnapshot
+                )
+            }
+            Text(
+                text = formatGForce(motion.gForce),
+                color = CarGlow,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = size * 0.16f)
+            )
+        }
+    }
+}
+
+private fun DrawScope.drawGForceFace(
+    lateralG: Float,
+    longitudinalG: Float,
+    hasSample: Boolean,
+    trail: List<Offset>
+) {
+    val cx = size.width / 2f
+    val cy = size.height / 2f
+    val r = size.minDimension / 2f - 3.dp.toPx()
+    val plotR = r * 0.72f
+
+    drawCircle(color = Color.Black, radius = r * 0.92f, center = Offset(cx, cy))
+    drawSegmentedRing(cx, cy, r)
+
+    // Scale rings at 0.5g / 1.0g / full scale
+    for (frac in listOf(0.5f / G_FULL_SCALE, 1f / G_FULL_SCALE, 1f)) {
+        drawCircle(
+            color = HorizonLine.copy(alpha = 0.22f),
+            radius = plotR * frac,
+            center = Offset(cx, cy),
+            style = Stroke(width = 1.dp.toPx())
+        )
+    }
+    // Crosshairs
+    drawLine(
+        color = HorizonLine.copy(alpha = 0.45f),
+        start = Offset(cx - plotR, cy),
+        end = Offset(cx + plotR, cy),
+        strokeWidth = 1.2.dp.toPx()
+    )
+    drawLine(
+        color = HorizonLine.copy(alpha = 0.45f),
+        start = Offset(cx, cy - plotR),
+        end = Offset(cx, cy + plotR),
+        strokeWidth = 1.2.dp.toPx()
+    )
+
+    fun toPlot(sample: Offset): Offset {
+        val x = (sample.x / G_FULL_SCALE).coerceIn(-1.15f, 1.15f)
+        val y = (-sample.y / G_FULL_SCALE).coerceIn(-1.15f, 1.15f) // +longitudinal → up
+        return Offset(cx + x * plotR, cy + y * plotR)
+    }
+
+    // History trail (older = dimmer)
+    if (trail.size >= 2) {
+        val path = Path()
+        trail.forEachIndexed { i, sample ->
+            val p = toPlot(sample)
+            if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+        }
+        drawPath(
+            path,
+            color = RingCyan.copy(alpha = 0.55f),
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+        )
+        trail.forEachIndexed { i, sample ->
+            val alpha = 0.15f + 0.55f * (i + 1).toFloat() / trail.size
+            drawCircle(
+                color = CarGlow.copy(alpha = alpha),
+                radius = 1.6.dp.toPx(),
+                center = toPlot(sample)
+            )
+        }
+    }
+
+    if (hasSample) {
+        val tip = toPlot(Offset(lateralG, longitudinalG))
+        drawCircle(color = CarGlow.copy(alpha = 0.35f), radius = 7.dp.toPx(), center = tip)
+        drawCircle(color = CarGlow, radius = 3.5.dp.toPx(), center = tip)
+        drawCircle(color = Color.Black, radius = 1.4.dp.toPx(), center = tip)
     }
 }
 

@@ -365,7 +365,7 @@ private fun LookTab(
 
     SectionTitle("Attitude")
     Text(
-        "Pitch / roll: text strip, dual WRX inclinometer rings, or one combined ring.",
+        "Layout style for motion gauges next to the tach.",
         color = HudColors.TextDim,
         fontSize = 11.sp,
         fontFamily = FontFamily.Monospace
@@ -378,6 +378,35 @@ private fun LookTab(
                 label = { Text(mode.label, fontFamily = FontFamily.Monospace) }
             )
         }
+    }
+    Text(
+        "Show gauges",
+        color = HudColors.TextDim,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace
+    )
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        MotionGaugeToggle(
+            label = "Pitch",
+            checked = preferences.showMotionPitch,
+            onCheckedChange = { checked -> onUpdate { it.copy(showMotionPitch = checked) } },
+            modifier = Modifier.weight(1f)
+        )
+        MotionGaugeToggle(
+            label = "Roll",
+            checked = preferences.showMotionRoll,
+            onCheckedChange = { checked -> onUpdate { it.copy(showMotionRoll = checked) } },
+            modifier = Modifier.weight(1f)
+        )
+        MotionGaugeToggle(
+            label = "G-force",
+            checked = preferences.showMotionGForce,
+            onCheckedChange = { checked -> onUpdate { it.copy(showMotionGForce = checked) } },
+            modifier = Modifier.weight(1f)
+        )
     }
 
     Text(
@@ -591,6 +620,31 @@ private fun AlarmsTab(
     }
     FloatField("Oil pressure red psi", preferences.oilPressureRedPsi) { v ->
         onUpdate { it.copy(oilPressureRedPsi = v) }
+    }
+}
+
+@Composable
+private fun MotionGaugeToggle(
+    label: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Checkbox(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
+        Text(
+            label,
+            color = if (checked) HudColors.TextPrimary else HudColors.TextDim,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 12.sp
+        )
     }
 }
 

@@ -3,15 +3,15 @@ package com.wrxhud.settings
 enum class MotionDisplayMode {
     /** Compact numeric PIT / ROL / G strip. */
     TEXT,
-    /** Dual circular gauges — pitch (side) + roll (rear) WRX rings. */
+    /** Circular gauges — pitch / roll WRX rings + optional G-force ring. */
     RINGS,
-    /** One circular gauge combining pitch + roll on a single car. */
+    /** One circular gauge combining pitch + roll on a single car (+ optional G). */
     COMBINED;
 
     val label: String
         get() = when (this) {
             TEXT -> "Text"
-            RINGS -> "Pitch / roll rings"
+            RINGS -> "Rings"
             COMBINED -> "Combined"
         }
 
