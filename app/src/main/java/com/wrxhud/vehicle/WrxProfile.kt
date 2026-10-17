@@ -94,6 +94,8 @@ object WrxProfile {
         const val RPM = 0x0C
         const val SPEED = 0x0D
         const val IAT = 0x0F
+        /** Absolute throttle position (%). */
+        const val THROTTLE_ABS = 0x11
         const val FUEL_LEVEL = 0x2F
         const val BARO = 0x33
         const val CONTROL_MODULE_VOLTAGE = 0x42
@@ -103,6 +105,8 @@ object WrxProfile {
         const val O2_EQ_RATIO = 0x34
         /** Commanded equivalence ratio (λ). */
         const val COMMANDED_EQ_RATIO = 0x44
+        /** Accelerator pedal position D — driver demand (%). */
+        const val ACCEL_PEDAL_D = 0x49
     }
 
     /** Gasoline stoichiometric AFR used to convert λ → AFR. */

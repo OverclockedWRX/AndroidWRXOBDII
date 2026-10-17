@@ -252,6 +252,22 @@ class ObdPoller(
                 updateGear()
             }
         }
+        // Absolute throttle (0x11) — widely supported.
+        if (supportedPids.contains(WrxProfile.Pid.THROTTLE_ABS) || supportedPids.isEmpty()) {
+            list += SlowPid("throttle") {
+                pollMode01(WrxProfile.Pid.THROTTLE_ABS) { data ->
+                    _snapshot.update { it.copy(throttlePercent = StnParser.decodePercent(data)) }
+                }
+            }
+        }
+        // Accelerator pedal D (0x49) — driver demand when ECU supports it.
+        if (supportedPids.contains(WrxProfile.Pid.ACCEL_PEDAL_D) || supportedPids.isEmpty()) {
+            list += SlowPid("accelPedal") {
+                pollMode01(WrxProfile.Pid.ACCEL_PEDAL_D) { data ->
+                    _snapshot.update { it.copy(acceleratorPercent = StnParser.decodePercent(data)) }
+                }
+            }
+        }
         list += SlowPid("mil") {
             pollMode01(WrxProfile.Pid.MONITOR_STATUS) { data ->
                 _snapshot.update { it.copy(milOn = StnParser.decodeMil(data)) }

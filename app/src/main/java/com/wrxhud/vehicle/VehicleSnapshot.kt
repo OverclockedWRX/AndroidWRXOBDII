@@ -25,6 +25,15 @@ data class VehicleSnapshot(
     val oilPressurePsi: Float? = null,
     val batteryVolts: Float? = null,
     val fuelLevelPercent: Float? = null,
+    /** Absolute throttle plate position (%), Mode 01 PID 0x11. */
+    val throttlePercent: Float? = null,
+    /** Accelerator pedal / driver demand (%), Mode 01 PID 0x49 when supported. */
+    val acceleratorPercent: Float? = null,
+    /**
+     * Brake pedal (%). Left null — no universal Mode 01 brake PID on FA24;
+     * reserved for a future OEM DID mapping.
+     */
+    val brakePercent: Float? = null,
     val milOn: Boolean? = null,
     val knockActive: Boolean? = null,
     val damLow: Boolean? = null,

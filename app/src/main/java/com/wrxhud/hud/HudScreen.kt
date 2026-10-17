@@ -38,6 +38,9 @@ fun HudScreen(
     connectionStatus: String,
     motion: MotionReading = MotionReading(),
     speedLimit: SpeedLimitReading = SpeedLimitReading(),
+    logging: Boolean = false,
+    logFileName: String? = null,
+    onToggleLogging: () -> Unit = {},
     onOpenSettings: () -> Unit
 ) {
     val thresholds = preferences.toAlarmThresholds()
@@ -96,7 +99,9 @@ fun HudScreen(
                     ),
                     visualStyle = preferences.tachVisualStyle,
                     boostPsi = snapshot.boostPsi,
-                    maxBoostPsi = preferences.boostRedPsi
+                    maxBoostPsi = preferences.boostRedPsi,
+                    logging = logging,
+                    onToggleLogging = onToggleLogging
                 )
             }
 
@@ -229,8 +234,12 @@ fun HudScreen(
                         append("  GPS:")
                         append(preferences.gpsSourceMode.name)
                         append(if (snapshot.gpsHasFix) "+" else "-")
+                        if (logging) {
+                            append("  REC:")
+                            append(logFileName ?: "on")
+                        }
                     },
-                    color = HudColors.TextDim,
+                    color = if (logging) HudColors.Red else HudColors.TextDim,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
                     modifier = Modifier.weight(1f),

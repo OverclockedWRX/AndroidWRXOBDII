@@ -16,7 +16,8 @@ fun AppShell(
     onUpdatePreferences: ((com.wrxhud.settings.HudPreferences) -> com.wrxhud.settings.HudPreferences) -> Unit,
     onScanPids: suspend () -> List<PidScanRow> = { emptyList() },
     connectionStatus: String = ui.connectionStatus,
-    onRecalibrateMotion: () -> Unit = {}
+    onRecalibrateMotion: () -> Unit = {},
+    onToggleLogging: () -> Unit = {}
 ) {
     var showSettings by remember { mutableStateOf(false) }
 
@@ -41,6 +42,9 @@ fun AppShell(
         connectionStatus = ui.connectionStatus,
         motion = ui.motion,
         speedLimit = ui.speedLimit,
+        logging = ui.logging,
+        logFileName = ui.logFileName,
+        onToggleLogging = onToggleLogging,
         onOpenSettings = { showSettings = true }
     )
 }

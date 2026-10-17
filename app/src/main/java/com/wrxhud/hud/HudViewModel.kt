@@ -11,6 +11,7 @@ import androidx.lifecycle.viewModelScope
 import com.wrxhud.gps.GpsSpeedProvider
 import com.wrxhud.gps.SpeedLimitProvider
 import com.wrxhud.gps.SpeedLimitReading
+import com.wrxhud.logging.CsvDataLogger
 import com.wrxhud.obd.ObdService
 import com.wrxhud.obd.PidScanRow
 import com.wrxhud.sensors.MotionMountCalibration
@@ -21,11 +22,14 @@ import com.wrxhud.settings.HudPreferences
 import com.wrxhud.settings.SettingsRepository
 import com.wrxhud.telemetry.TelemetryHub
 import com.wrxhud.vehicle.VehicleSnapshot
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class HudUiState(
@@ -34,7 +38,9 @@ data class HudUiState(
     val connectionStatus: String = "Idle",
     val motion: MotionReading = MotionReading(),
     val speedLimit: SpeedLimitReading = SpeedLimitReading(),
-    val runtimeStarted: Boolean = false
+    val runtimeStarted: Boolean = false,
+    val logging: Boolean = false,
+    val logFileName: String? = null
 )
 
 class HudViewModel(application: Application) : AndroidViewModel(application) {
@@ -42,12 +48,14 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     private val gps = GpsSpeedProvider(application)
     private val motion = MotionSensorProvider(application)
     private val speedLimitProvider = SpeedLimitProvider(viewModelScope, application)
+    private val dataLogger = CsvDataLogger(application)
 
     private val _serviceSnapshot = MutableStateFlow(VehicleSnapshot())
     private val _status = MutableStateFlow("Idle")
     private val _runtimeStarted = MutableStateFlow(false)
     private var service: ObdService? = null
     private var bound = false
+    private var logJob: Job? = null
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
@@ -78,12 +86,15 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         ) { snap, prefs, status, gpsReading, runtimeStarted ->
             Triple(snap to prefs, status to gpsReading, runtimeStarted)
         },
-        motion.reading,
-        speedLimitProvider.reading
-    ) { core, motionReading, speedLimit ->
+        combine(motion.reading, speedLimitProvider.reading, dataLogger.recording, dataLogger.activeFileName) {
+                motionReading, speedLimit, logging, logName ->
+            Quad(motionReading, speedLimit, logging, logName)
+        }
+    ) { core, logSide ->
         val (snapPrefs, statusGps, runtimeStarted) = core
         val (snap, prefs) = snapPrefs
         val (status, gpsReading) = statusGps
+        val (motionReading, speedLimit, logging, logName) = logSide
         val gpsSpeed = gpsReading.speedMps
         val gpsFix = gpsReading.hasFix
 
@@ -130,9 +141,13 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             connectionStatus = displayStatus,
             motion = calibratedMotion,
             speedLimit = speedLimit,
-            runtimeStarted = runtimeStarted
+            runtimeStarted = runtimeStarted,
+            logging = logging,
+            logFileName = logName
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HudUiState())
+
+    private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 
     private var lastSimulatorSetting: Boolean? = null
     private var lastGpsMode: com.wrxhud.gps.GpsSourceMode? = null
@@ -242,7 +257,39 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
 
     fun isLiveObdConnected(): Boolean = service?.isLiveConnected() == true
 
+    fun toggleDataLog() {
+        if (dataLogger.recording.value) {
+            stopDataLog()
+        } else {
+            startDataLog()
+        }
+    }
+
+    fun startDataLog() {
+        if (dataLogger.recording.value) return
+        val started = dataLogger.start() ?: return
+        logJob?.cancel()
+        logJob = viewModelScope.launch {
+            var ticks = 0
+            while (isActive && dataLogger.recording.value) {
+                val ui = uiState.value
+                dataLogger.append(ui.snapshot, ui.motion, ui.speedLimit)
+                ticks++
+                if (ticks % 10 == 0) dataLogger.flush()
+                delay(100L)
+            }
+        }
+        android.util.Log.i("HudViewModel", "Data log → ${started.absolutePath}")
+    }
+
+    fun stopDataLog() {
+        logJob?.cancel()
+        logJob = null
+        dataLogger.stop()
+    }
+
     override fun onCleared() {
+        stopDataLog()
         speedLimitProvider.stop()
         gps.destroy()
         motion.stop()

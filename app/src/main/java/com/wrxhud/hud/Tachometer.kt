@@ -1,6 +1,9 @@
 package com.wrxhud.hud
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +14,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -49,6 +56,8 @@ fun Tachometer(
     visualStyle: TachVisualStyle = TachVisualStyle.BAR_3D,
     boostPsi: Float? = null,
     maxBoostPsi: Float = 22f,
+    logging: Boolean = false,
+    onToggleLogging: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val maxRpm = (redline + 500).coerceAtLeast(7000).toFloat()
@@ -121,11 +130,10 @@ fun Tachometer(
                 .weight(1f)
                 .fillMaxHeight()
         ) {
-            // Numerals left, pitch/roll/G right — tach bar runs full-width below.
+            // Numerals left, REC in the middle gap, pitch/roll/G right — bar below.
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.Bottom
             ) {
                 Column {
                     Text(
@@ -142,12 +150,23 @@ fun Tachometer(
                         fontFamily = FontFamily.Monospace
                     )
                 }
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    DataLogRecordButton(
+                        logging = logging,
+                        onClick = onToggleLogging
+                    )
+                }
                 if (motion.available && motionVisibility.anyVisible) {
                     MotionAttitudeDisplay(
                         motion = motion,
                         mode = motionDisplayMode,
                         visibility = motionVisibility,
-                        modifier = Modifier.padding(start = 8.dp, bottom = 2.dp)
+                        modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
                     )
                 }
             }
@@ -260,6 +279,40 @@ fun Tachometer(
             modifier = Modifier
                 .padding(start = 12.dp)
                 .fillMaxHeight()
+        )
+    }
+}
+
+@Composable
+fun DataLogRecordButton(
+    logging: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val border = if (logging) HudColors.Red else HudColors.Border
+    val label = if (logging) "STOP" else "REC"
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(HudColors.Panel)
+            .border(1.5.dp, border, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(14.dp)
+                .clip(if (logging) RoundedCornerShape(2.dp) else CircleShape)
+                .background(if (logging) HudColors.Red else HudColors.Accent)
+        )
+        Text(
+            text = label,
+            color = if (logging) HudColors.Red else HudColors.TextPrimary,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
         )
     }
 }

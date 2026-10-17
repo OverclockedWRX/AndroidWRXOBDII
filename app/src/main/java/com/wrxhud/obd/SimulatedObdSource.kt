@@ -142,6 +142,11 @@ class SimulatedObdSource(
                     + 3f * sin(t * 0.6).toFloat()).coerceIn(8f, 60f),
                 batteryVolts = battery,
                 fuelLevelPercent = fuel,
+                throttlePercent = (8f + 85f * (rpm / redlineRpm.toFloat()).coerceIn(0f, 1f)
+                    + 5f * sin(t * 1.1).toFloat()).coerceIn(0f, 100f),
+                acceleratorPercent = (5f + 90f * (rpm / redlineRpm.toFloat()).coerceIn(0f, 1f)
+                    + 4f * sin(t * 1.3).toFloat()).coerceIn(0f, 100f),
+                brakePercent = null,
                 milOn = alert(ALERT_CEL),
                 knockActive = alert(ALERT_KNOCK),
                 damLow = alert(ALERT_DAM),
