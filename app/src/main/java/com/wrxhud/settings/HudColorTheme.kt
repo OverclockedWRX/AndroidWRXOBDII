@@ -9,7 +9,9 @@ enum class HudColorTheme {
     NIGHT,
     EINK,
     /** Rally blue + STI cherry red (and gold) on a dark cockpit. */
-    SUBARU;
+    SUBARU,
+    /** Factory WRX STI digital cluster — black dials, white ticks, cherry needles. */
+    WRX_CLUSTER;
 
     val label: String
         get() = when (this) {
@@ -18,6 +20,7 @@ enum class HudColorTheme {
             NIGHT -> "Night"
             EINK -> "E-ink day"
             SUBARU -> "Subaru"
+            WRX_CLUSTER -> "WRX cluster"
         }
 
     companion object {

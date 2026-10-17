@@ -170,6 +170,33 @@ private val SubaruScheme = HudColorScheme(
     attitudeInk = Color(0xFF0A1018)
 )
 
+/**
+ * Factory WRX STI digital instrument cluster — charcoal dials, cool navy wash,
+ * white numerals, and STI cherry-magenta needles / gauge rings.
+ */
+private val WrxClusterScheme = HudColorScheme(
+    background = Color(0xFF05070C),
+    panel = Color(0xFF0C1018),
+    border = Color(0xFF2A303C),
+    textPrimary = Color(0xFFF5F7FA),
+    textDim = Color(0xFF9AA3B0),
+    // STI logo / needle cherry (slightly magenta scarlet)
+    accent = Color(0xFFE6005C),
+    boostBlue = Color(0xFF4A90D9),
+    green = Color(0xFF4ADE80),
+    amber = Color(0xFFF5C518),
+    red = Color(0xFFE6005C),
+    tachTrack = Color(0xFF141820),
+    tachFill = Color(0xFFF0F2F5),
+    lampOff = Color(0xFF1C222C),
+    attitudeRingUpper = Color(0xFFE6005C),
+    attitudeRingLower = Color(0xFFFF4D7A),
+    attitudeGlow = Color(0xFFFF6B8A),
+    attitudeHorizon = Color(0xFFA8B0BC),
+    attitudeFace = Color(0xFF080A10),
+    attitudeInk = Color(0xFF12161E)
+)
+
 /** Theme-aware colors for pitch / roll / G-force inclinometer rings. */
 data class AttitudePalette(
     val face: Color,
@@ -188,6 +215,7 @@ object HudColors {
             HudColorTheme.NIGHT -> NightScheme
             HudColorTheme.EINK -> EinkScheme
             HudColorTheme.SUBARU -> SubaruScheme
+            HudColorTheme.WRX_CLUSTER -> WrxClusterScheme
         }
 
     val Background: Color get() = scheme.background

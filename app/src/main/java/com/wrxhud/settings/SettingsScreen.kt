@@ -266,7 +266,7 @@ private fun LookTab(
         fontFamily = FontFamily.Monospace
     )
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        HudColorTheme.entries.take(2).forEach { theme ->
+        HudColorTheme.entries.take(3).forEach { theme ->
             FilterChip(
                 selected = preferences.colorTheme == theme,
                 onClick = {
@@ -278,7 +278,7 @@ private fun LookTab(
         }
     }
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        HudColorTheme.entries.drop(2).forEach { theme ->
+        HudColorTheme.entries.drop(3).forEach { theme ->
             FilterChip(
                 selected = preferences.colorTheme == theme,
                 onClick = {
@@ -290,7 +290,7 @@ private fun LookTab(
         }
     }
     Text(
-        "Night dims chromas; E-ink is cream/black daylight; Subaru is rally blue with STI cherry red.",
+        "WRX cluster matches the factory STI dials (white ticks, cherry needles). Subaru is rally blue + cherry.",
         color = HudColors.TextDim,
         fontSize = 11.sp,
         fontFamily = FontFamily.Monospace,

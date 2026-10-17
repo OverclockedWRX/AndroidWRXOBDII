@@ -1,6 +1,7 @@
 package com.wrxhud.hud
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -119,20 +120,35 @@ fun Tachometer(
                 .weight(1f)
                 .fillMaxHeight()
         ) {
-            Column {
-                Text(
-                    text = UnitConverters.formatRpm(displayRpm),
-                    color = rpmColor,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-                Text(
-                    text = "RPM",
-                    color = HudColors.TextDim,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace
-                )
+            // Numerals left, pitch/roll/G right — tach bar runs full-width below.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text(
+                        text = UnitConverters.formatRpm(displayRpm),
+                        color = rpmColor,
+                        fontSize = 48.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    Text(
+                        text = "RPM",
+                        color = HudColors.TextDim,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+                if (motion.available && motionVisibility.anyVisible) {
+                    MotionAttitudeDisplay(
+                        motion = motion,
+                        mode = motionDisplayMode,
+                        visibility = motionVisibility,
+                        modifier = Modifier.padding(start = 8.dp, bottom = 2.dp)
+                    )
+                }
             }
 
             Spacer(Modifier.height(4.dp))
@@ -222,16 +238,6 @@ fun Tachometer(
                     }
                 }
             }
-        }
-
-        // Pitch / roll / G sit at the right end of the tach bar, just before gear.
-        if (motion.available && motionVisibility.anyVisible) {
-            MotionAttitudeDisplay(
-                motion = motion,
-                mode = motionDisplayMode,
-                visibility = motionVisibility,
-                modifier = Modifier.padding(start = 8.dp, end = 4.dp)
-            )
         }
 
         GearIndicator(
