@@ -290,7 +290,7 @@ private fun LookTab(
         }
     }
     Text(
-        "Night dims chromas; E-ink is cream/black daylight; Subaru is rally blue with STI gold accents.",
+        "Night dims chromas; E-ink is cream/black daylight; Subaru is rally blue with STI cherry red.",
         color = HudColors.TextDim,
         fontSize = 11.sp,
         fontFamily = FontFamily.Monospace,

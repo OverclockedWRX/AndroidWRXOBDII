@@ -8,7 +8,7 @@ enum class HudColorTheme {
     PINKY,
     NIGHT,
     EINK,
-    /** Rally blue + STI gold accents on a dark cockpit. */
+    /** Rally blue + STI cherry red (and gold) on a dark cockpit. */
     SUBARU;
 
     val label: String

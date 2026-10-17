@@ -142,24 +142,29 @@ private val EinkScheme = HudColorScheme(
     attitudeInk = Color(0xFFD4D0C4)
 )
 
-/** Subaru / STI inspired — World Rally Blue cockpit with gold accents. */
+/**
+ * Subaru / STI inspired — World Rally Blue cockpit with STI cherry red
+ * (badge / stitching) and gold secondary accents.
+ */
 private val SubaruScheme = HudColorScheme(
     background = Color(0xFF070B12),
-    panel = Color(0xFF0F1824),
-    border = Color(0xFF1E3A5F),
+    panel = Color(0xFF101820),
+    border = Color(0xFF3A1520),
     textPrimary = Color(0xFFE8EEF6),
-    textDim = Color(0xFF7A90A8),
-    accent = Color(0xFFC9A227),
+    textDim = Color(0xFF8A96A8),
+    // STI cherry red — primary brand accent (tach redline, lamps, highlights)
+    accent = Color(0xFFD70026),
     boostBlue = Color(0xFF2F6FED),
     green = Color(0xFF3DDC97),
+    // STI gold remains for warn / mid zone
     amber = Color(0xFFE8B923),
-    red = Color(0xFFE11D2E),
+    red = Color(0xFFC8102E),
     tachTrack = Color(0xFF152033),
     tachFill = Color(0xFFD6E4F5),
     lampOff = Color(0xFF1A2838),
-    attitudeRingUpper = Color(0xFF3B82F6),
-    attitudeRingLower = Color(0xFFE8B923),
-    attitudeGlow = Color(0xFF5BA3FF),
+    attitudeRingUpper = Color(0xFF2F6FED),
+    attitudeRingLower = Color(0xFFD70026),
+    attitudeGlow = Color(0xFFFF3B5C),
     attitudeHorizon = Color(0xFF7A90A8),
     attitudeFace = Color(0xFF05080E),
     attitudeInk = Color(0xFF0A1018)
