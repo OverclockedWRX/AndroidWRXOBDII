@@ -43,12 +43,6 @@ import kotlin.math.hypot
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
-/** Ring colors matching the inclinometer reference (lime upper / cyan lower). */
-private val RingGreen = Color(0xFFB8F000)
-private val RingCyan = Color(0xFF00E5FF)
-private val CarGlow = Color(0xFFE8FF4A)
-private val HorizonLine = Color(0xFF94A3B8)
-
 data class MotionGaugeVisibility(
     val pitch: Boolean = true,
     val roll: Boolean = true,
@@ -149,20 +143,20 @@ private fun DualAttitudeRings(
             InclinometerGauge(
                 degrees = motion.pitchDeg,
                 kind = InclinometerKind.PITCH,
-                size = 112.dp
+                size = 76.dp
             )
         }
         if (visibility.roll) {
             InclinometerGauge(
                 degrees = motion.rollDeg,
                 kind = InclinometerKind.ROLL,
-                size = 112.dp
+                size = 76.dp
             )
         }
         if (visibility.gForce) {
             GForceGauge(
                 motion = motion,
-                size = 112.dp
+                size = 76.dp
             )
         }
     }
@@ -190,26 +184,26 @@ private fun CombinedAttitudeRing(
                     degrees = motion.pitchDeg,
                     secondaryDegrees = motion.rollDeg,
                     kind = InclinometerKind.COMBINED,
-                    size = 120.dp
+                    size = 84.dp
                 )
             }
             visibility.pitch -> {
                 InclinometerGauge(
                     degrees = motion.pitchDeg,
                     kind = InclinometerKind.PITCH,
-                    size = 112.dp
+                    size = 76.dp
                 )
             }
             visibility.roll -> {
                 InclinometerGauge(
                     degrees = motion.rollDeg,
                     kind = InclinometerKind.ROLL,
-                    size = 112.dp
+                    size = 76.dp
                 )
             }
         }
         if (visibility.gForce) {
-            GForceGauge(motion = motion, size = 112.dp)
+            GForceGauge(motion = motion, size = 76.dp)
         }
         if (visibility.pitch || visibility.roll) {
             Column(
@@ -245,6 +239,7 @@ private fun GForceGauge(
         }
     }
     val trailSnapshot = trail.toList()
+    val palette = HudColors.Attitude
 
     Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -252,12 +247,13 @@ private fun GForceGauge(
                 lateralG = lat ?: 0f,
                 longitudinalG = lon ?: 0f,
                 hasSample = lat != null && lon != null,
-                trail = trailSnapshot
+                trail = trailSnapshot,
+                palette = palette
             )
         }
         Text(
             text = formatGForce(motion.gForce),
-            color = CarGlow,
+            color = palette.glow,
             fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
@@ -273,20 +269,21 @@ private fun DrawScope.drawGForceFace(
     lateralG: Float,
     longitudinalG: Float,
     hasSample: Boolean,
-    trail: List<Offset>
+    trail: List<Offset>,
+    palette: AttitudePalette
 ) {
     val cx = size.width / 2f
     val cy = size.height / 2f
     val r = size.minDimension / 2f - 3.dp.toPx()
     val plotR = r * 0.72f
 
-    drawCircle(color = Color.Black, radius = r * 0.92f, center = Offset(cx, cy))
-    drawSegmentedRing(cx, cy, r)
+    drawCircle(color = palette.face, radius = r * 0.92f, center = Offset(cx, cy))
+    drawSegmentedRing(cx, cy, r, palette)
 
     // Scale rings at 0.5g / 1.0g / full scale
     for (frac in listOf(0.5f / G_FULL_SCALE, 1f / G_FULL_SCALE, 1f)) {
         drawCircle(
-            color = HorizonLine.copy(alpha = 0.22f),
+            color = palette.horizon.copy(alpha = 0.22f),
             radius = plotR * frac,
             center = Offset(cx, cy),
             style = Stroke(width = 1.dp.toPx())
@@ -294,13 +291,13 @@ private fun DrawScope.drawGForceFace(
     }
     // Crosshairs
     drawLine(
-        color = HorizonLine.copy(alpha = 0.45f),
+        color = palette.horizon.copy(alpha = 0.45f),
         start = Offset(cx - plotR, cy),
         end = Offset(cx + plotR, cy),
         strokeWidth = 1.2.dp.toPx()
     )
     drawLine(
-        color = HorizonLine.copy(alpha = 0.45f),
+        color = palette.horizon.copy(alpha = 0.45f),
         start = Offset(cx, cy - plotR),
         end = Offset(cx, cy + plotR),
         strokeWidth = 1.2.dp.toPx()
@@ -321,13 +318,13 @@ private fun DrawScope.drawGForceFace(
         }
         drawPath(
             path,
-            color = RingCyan.copy(alpha = 0.55f),
+            color = palette.ringLower.copy(alpha = 0.55f),
             style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
         )
         trail.forEachIndexed { i, sample ->
             val alpha = 0.15f + 0.55f * (i + 1).toFloat() / trail.size
             drawCircle(
-                color = CarGlow.copy(alpha = alpha),
+                color = palette.glow.copy(alpha = alpha),
                 radius = 1.6.dp.toPx(),
                 center = toPlot(sample)
             )
@@ -336,9 +333,9 @@ private fun DrawScope.drawGForceFace(
 
     if (hasSample) {
         val tip = toPlot(Offset(lateralG, longitudinalG))
-        drawCircle(color = CarGlow.copy(alpha = 0.35f), radius = 7.dp.toPx(), center = tip)
-        drawCircle(color = CarGlow, radius = 3.5.dp.toPx(), center = tip)
-        drawCircle(color = Color.Black, radius = 1.4.dp.toPx(), center = tip)
+        drawCircle(color = palette.glow.copy(alpha = 0.35f), radius = 7.dp.toPx(), center = tip)
+        drawCircle(color = palette.glow, radius = 3.5.dp.toPx(), center = tip)
+        drawCircle(color = palette.ink, radius = 1.4.dp.toPx(), center = tip)
     }
 }
 
@@ -377,17 +374,20 @@ private fun InclinometerGauge(
         else -> if (degrees == null) "—" else "${signed(degrees.roundToInt())}°"
     }
 
+    val palette = HudColors.Attitude
+
     Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawInclinometerFace(
                 kind = kind,
                 pitchDeg = deg,
-                rollDeg = if (kind == InclinometerKind.COMBINED) roll else deg
+                rollDeg = if (kind == InclinometerKind.COMBINED) roll else deg,
+                palette = palette
             )
         }
         Text(
             text = valueLabel,
-            color = CarGlow,
+            color = palette.glow,
             fontSize = if (kind == InclinometerKind.COMBINED) 9.sp else 11.sp,
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
@@ -407,18 +407,19 @@ private fun signed(v: Int?): String {
 private fun DrawScope.drawInclinometerFace(
     kind: InclinometerKind,
     pitchDeg: Float,
-    rollDeg: Float
+    rollDeg: Float,
+    palette: AttitudePalette
 ) {
     val cx = size.width / 2f
     val cy = size.height / 2f
     val r = size.minDimension / 2f - 3.dp.toPx()
 
-    drawCircle(color = Color.Black, radius = r * 0.92f, center = Offset(cx, cy))
-    drawSegmentedRing(cx, cy, r)
+    drawCircle(color = palette.face, radius = r * 0.92f, center = Offset(cx, cy))
+    drawSegmentedRing(cx, cy, r, palette)
 
     // Horizon reference through 0°
     drawLine(
-        color = HorizonLine.copy(alpha = 0.55f),
+        color = palette.horizon.copy(alpha = 0.55f),
         start = Offset(cx - r * 0.72f, cy),
         end = Offset(cx + r * 0.72f, cy),
         strokeWidth = 1.2.dp.toPx()
@@ -434,14 +435,14 @@ private fun DrawScope.drawInclinometerFace(
                 // Screen-remapped pitch: positive = nose up → clockwise for side-view nose-right.
                 val tilt = pitchDeg.coerceIn(-45f, 45f)
                 rotate(degrees = tilt, pivot = Offset.Zero) {
-                    drawWrxVbSide(scale = r * 0.058f)
+                    drawWrxVbSide(scale = r * 0.058f, palette = palette)
                 }
             }
             InclinometerKind.ROLL -> {
                 // Screen-remapped roll: positive = lean right → clockwise for rear view.
                 val tilt = rollDeg.coerceIn(-45f, 45f)
                 rotate(degrees = tilt, pivot = Offset.Zero) {
-                    drawWrxVbRear(scale = r * 0.058f)
+                    drawWrxVbRear(scale = r * 0.058f, palette = palette)
                 }
             }
             InclinometerKind.COMBINED -> {
@@ -450,7 +451,7 @@ private fun DrawScope.drawInclinometerFace(
                 rotate(degrees = ro, pivot = Offset.Zero) {
                     val foreshorten = (1f - p / 100f).coerceIn(0.65f, 1.15f)
                     scale(scaleX = 1f, scaleY = foreshorten, pivot = Offset.Zero) {
-                        drawWrxVbRear(scale = r * 0.042f)
+                        drawWrxVbRear(scale = r * 0.042f, palette = palette)
                     }
                 }
             }
@@ -458,8 +459,8 @@ private fun DrawScope.drawInclinometerFace(
     }
 }
 
-/** Segmented lime (upper) / cyan (lower) ring like the reference inclinometer. */
-private fun DrawScope.drawSegmentedRing(cx: Float, cy: Float, r: Float) {
+/** Segmented ring — upper/lower colors from the active theme. */
+private fun DrawScope.drawSegmentedRing(cx: Float, cy: Float, r: Float, palette: AttitudePalette) {
     val segments = 52
     val sweep = 360f / segments
     val gap = sweep * 0.28f
@@ -471,7 +472,7 @@ private fun DrawScope.drawSegmentedRing(cx: Float, cy: Float, r: Float) {
         val rad = Math.toRadians(mid.toDouble())
         // Android angles: 0° = 3 o'clock, clockwise; sin>0 → below center.
         val isUpper = sin(rad) < 0.0
-        val color = if (isUpper) RingGreen else RingCyan
+        val color = if (isUpper) palette.ringUpper else palette.ringLower
         drawArc(
             color = color,
             startAngle = start,
@@ -486,30 +487,25 @@ private fun DrawScope.drawSegmentedRing(cx: Float, cy: Float, r: Float) {
 
 /**
  * 2022+ WRX VB side silhouette — sedan rake, hood scoop, trunk wing, square-ish nose.
- * Nose points +X; glow yellow-green.
+ * Nose points +X; fill/glow follow the active theme.
  */
-private fun DrawScope.drawWrxVbSide(scale: Float) {
+private fun DrawScope.drawWrxVbSide(scale: Float, palette: AttitudePalette) {
     val s = scale
+    val glow = palette.glow
+    val ink = palette.ink
     val body = Path().apply {
-        // Rocker
         moveTo(-9.2f * s, 2.4f * s)
-        // Rear bumper → wing mount
         lineTo(-8.6f * s, 1.2f * s)
         lineTo(-7.8f * s, -0.2f * s)
-        // Trunk / wing
         lineTo(-6.2f * s, -1.0f * s)
-        lineTo(-5.4f * s, -2.4f * s) // wing tip
+        lineTo(-5.4f * s, -2.4f * s)
         lineTo(-4.6f * s, -1.2f * s)
-        // Roof
         lineTo(-1.2f * s, -2.6f * s)
         lineTo(2.8f * s, -2.5f * s)
-        // A-pillar / hood
         lineTo(4.2f * s, -1.1f * s)
-        // Hood scoop bump
         lineTo(5.0f * s, -1.35f * s)
         lineTo(6.2f * s, -1.0f * s)
         lineTo(7.4f * s, -0.35f * s)
-        // Nose
         lineTo(9.0f * s, 0.55f * s)
         lineTo(9.1f * s, 2.4f * s)
         close()
@@ -517,12 +513,11 @@ private fun DrawScope.drawWrxVbSide(scale: Float) {
     drawPath(
         body,
         brush = Brush.verticalGradient(
-            colors = listOf(CarGlow, CarGlow.copy(alpha = 0.75f)),
+            colors = listOf(glow, glow.copy(alpha = 0.75f)),
             startY = -3f * s,
             endY = 3f * s
         )
     )
-    // Cabin glass
     drawPath(
         Path().apply {
             moveTo(-3.8f * s, -0.4f * s)
@@ -531,27 +526,26 @@ private fun DrawScope.drawWrxVbSide(scale: Float) {
             lineTo(3.6f * s, -0.5f * s)
             close()
         },
-        color = Color(0xFF0A0A0A).copy(alpha = 0.55f)
+        color = ink.copy(alpha = 0.55f)
     )
-    // Soft glow outline
-    drawPath(body, color = CarGlow.copy(alpha = 0.35f), style = Stroke(width = 1.4.dp.toPx()))
-    // Wheels
-    drawCircle(Color.Black.copy(alpha = 0.9f), 1.85f * s, Offset(-5.2f * s, 2.85f * s))
-    drawCircle(Color.Black.copy(alpha = 0.9f), 1.85f * s, Offset(5.0f * s, 2.85f * s))
-    drawCircle(CarGlow.copy(alpha = 0.4f), 0.7f * s, Offset(-5.2f * s, 2.85f * s))
-    drawCircle(CarGlow.copy(alpha = 0.4f), 0.7f * s, Offset(5.0f * s, 2.85f * s))
+    drawPath(body, color = glow.copy(alpha = 0.35f), style = Stroke(width = 1.4.dp.toPx()))
+    drawCircle(ink.copy(alpha = 0.9f), 1.85f * s, Offset(-5.2f * s, 2.85f * s))
+    drawCircle(ink.copy(alpha = 0.9f), 1.85f * s, Offset(5.0f * s, 2.85f * s))
+    drawCircle(glow.copy(alpha = 0.4f), 0.7f * s, Offset(-5.2f * s, 2.85f * s))
+    drawCircle(glow.copy(alpha = 0.4f), 0.7f * s, Offset(5.0f * s, 2.85f * s))
 }
 
 /**
  * WRX VB rear / 3/4 rear — wide fenders, roof spoiler / trunk wing, hexagonal cues.
  */
-private fun DrawScope.drawWrxVbRear(scale: Float) {
+private fun DrawScope.drawWrxVbRear(scale: Float, palette: AttitudePalette) {
     val s = scale
+    val glow = palette.glow
+    val ink = palette.ink
     val body = Path().apply {
         moveTo(-7.2f * s, 2.6f * s)
         lineTo(-6.4f * s, 0.2f * s)
         lineTo(-5.2f * s, -1.6f * s)
-        // Wing
         lineTo(-4.0f * s, -2.0f * s)
         lineTo(-3.2f * s, -3.2f * s)
         lineTo(3.2f * s, -3.2f * s)
@@ -566,30 +560,26 @@ private fun DrawScope.drawWrxVbRear(scale: Float) {
     drawPath(
         body,
         brush = Brush.verticalGradient(
-            colors = listOf(CarGlow, CarGlow.copy(alpha = 0.7f)),
+            colors = listOf(glow, glow.copy(alpha = 0.7f)),
             startY = -3.5f * s,
             endY = 3.5f * s
         )
     )
-    // Rear glass
     drawRoundRect(
-        color = Color(0xFF0A0A0A).copy(alpha = 0.55f),
+        color = ink.copy(alpha = 0.55f),
         topLeft = Offset(-3.4f * s, -1.8f * s),
         size = Size(6.8f * s, 2.6f * s),
         cornerRadius = androidx.compose.ui.geometry.CornerRadius(0.6f * s, 0.6f * s)
     )
-    // Wing bar glow
     drawLine(
-        color = CarGlow,
+        color = glow,
         start = Offset(-3.4f * s, -3.25f * s),
         end = Offset(3.4f * s, -3.25f * s),
         strokeWidth = 2.2f * s.coerceAtLeast(1f)
     )
-    drawPath(body, color = CarGlow.copy(alpha = 0.3f), style = Stroke(width = 1.4.dp.toPx()))
-    // Exhaust tips
-    drawCircle(Color.Black.copy(alpha = 0.85f), 0.7f * s, Offset(-2.8f * s, 3.35f * s))
-    drawCircle(Color.Black.copy(alpha = 0.85f), 0.7f * s, Offset(2.8f * s, 3.35f * s))
-    // Wheels
-    drawCircle(Color.Black.copy(alpha = 0.9f), 1.7f * s, Offset(-5.0f * s, 3.4f * s))
-    drawCircle(Color.Black.copy(alpha = 0.9f), 1.7f * s, Offset(5.0f * s, 3.4f * s))
+    drawPath(body, color = glow.copy(alpha = 0.3f), style = Stroke(width = 1.4.dp.toPx()))
+    drawCircle(ink.copy(alpha = 0.85f), 0.7f * s, Offset(-2.8f * s, 3.35f * s))
+    drawCircle(ink.copy(alpha = 0.85f), 0.7f * s, Offset(2.8f * s, 3.35f * s))
+    drawCircle(ink.copy(alpha = 0.9f), 1.7f * s, Offset(-5.0f * s, 3.4f * s))
+    drawCircle(ink.copy(alpha = 0.9f), 1.7f * s, Offset(5.0f * s, 3.4f * s))
 }

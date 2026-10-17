@@ -42,44 +42,49 @@ fun SpeedLimitSign(
 
     Column(
         modifier = modifier
-            .widthIn(min = 64.dp)
+            .widthIn(min = 52.dp, max = 72.dp)
             .clip(shape)
             .background(SignWhite, shape)
-            .border(3.dp, SignBorder, shape)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .border(2.dp, SignBorder, shape)
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "LIMIT",
+            text = "LIM",
             color = SignBlack,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
+            letterSpacing = 1.sp,
+            maxLines = 1,
+            softWrap = false
         )
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = "000",
                 color = Color.Transparent,
-                fontSize = 32.sp,
+                fontSize = 28.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = valueText,
                 color = SignBlack,
-                fontSize = 32.sp,
+                fontSize = 28.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false
             )
         }
         Text(
             text = if (reading.limit != null) unitHint else (reading.status ?: unitHint),
             color = SignBlack.copy(alpha = 0.7f),
-            fontSize = 9.sp,
+            fontSize = 8.sp,
             fontFamily = FontFamily.Monospace,
-            maxLines = 1
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

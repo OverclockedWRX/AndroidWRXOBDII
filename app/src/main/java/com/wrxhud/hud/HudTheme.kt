@@ -34,7 +34,19 @@ private data class HudColorScheme(
     val red: Color,
     val tachTrack: Color,
     val tachFill: Color,
-    val lampOff: Color
+    val lampOff: Color,
+    /** Pitch/roll/G ring — upper arc. */
+    val attitudeRingUpper: Color,
+    /** Pitch/roll/G ring — lower arc. */
+    val attitudeRingLower: Color,
+    /** Car silhouette / G blob / numeral glow. */
+    val attitudeGlow: Color,
+    /** Horizon / crosshair lines inside attitude gauges. */
+    val attitudeHorizon: Color,
+    /** Inner dial face behind the car / G plot. */
+    val attitudeFace: Color,
+    /** Glass, wheels, G-tip center (contrasts with glow). */
+    val attitudeInk: Color
 )
 
 private val ClassicScheme = HudColorScheme(
@@ -50,7 +62,13 @@ private val ClassicScheme = HudColorScheme(
     red = Color(0xFFEF4444),
     tachTrack = Color(0xFF1F1F1F),
     tachFill = Color(0xFFE8E8E8),
-    lampOff = Color(0xFF2A2A2A)
+    lampOff = Color(0xFF2A2A2A),
+    attitudeRingUpper = Color(0xFFB8F000),
+    attitudeRingLower = Color(0xFF00E5FF),
+    attitudeGlow = Color(0xFFE8FF4A),
+    attitudeHorizon = Color(0xFF94A3B8),
+    attitudeFace = Color(0xFF000000),
+    attitudeInk = Color(0xFF0A0A0A)
 )
 
 private val PinkyScheme = HudColorScheme(
@@ -66,7 +84,13 @@ private val PinkyScheme = HudColorScheme(
     red = Color(0xFFE11D8A),
     tachTrack = Color(0xFF2A1520),
     tachFill = Color(0xFFFFE4F0),
-    lampOff = Color(0xFF3D2433)
+    lampOff = Color(0xFF3D2433),
+    attitudeRingUpper = Color(0xFFFF8AC4),
+    attitudeRingLower = Color(0xFFF472B6),
+    attitudeGlow = Color(0xFFFFB7D5),
+    attitudeHorizon = Color(0xFFD4A0B5),
+    attitudeFace = Color(0xFF1A0A12),
+    attitudeInk = Color(0xFF2A1018)
 )
 
 /** Deeper blacks, muted chromas — easier on night eyes. */
@@ -83,7 +107,13 @@ private val NightScheme = HudColorScheme(
     red = Color(0xFF991B1B),
     tachTrack = Color(0xFF101010),
     tachFill = Color(0xFF9CA3AF),
-    lampOff = Color(0xFF181818)
+    lampOff = Color(0xFF181818),
+    attitudeRingUpper = Color(0xFF3F6212),
+    attitudeRingLower = Color(0xFF1E3A5F),
+    attitudeGlow = Color(0xFFA3A3A3),
+    attitudeHorizon = Color(0xFF525252),
+    attitudeFace = Color(0xFF050505),
+    attitudeInk = Color(0xFF0A0A0A)
 )
 
 /**
@@ -103,7 +133,23 @@ private val EinkScheme = HudColorScheme(
     red = Color(0xFF000000),
     tachTrack = Color(0xFFD4D0C4),
     tachFill = Color(0xFF111111),
-    lampOff = Color(0xFFC8C4B8)
+    lampOff = Color(0xFFC8C4B8),
+    attitudeRingUpper = Color(0xFF2A2A2A),
+    attitudeRingLower = Color(0xFF5A5A5A),
+    attitudeGlow = Color(0xFF111111),
+    attitudeHorizon = Color(0xFF6B6B6B),
+    attitudeFace = Color(0xFFF7F4EB),
+    attitudeInk = Color(0xFFD4D0C4)
+)
+
+/** Theme-aware colors for pitch / roll / G-force inclinometer rings. */
+data class AttitudePalette(
+    val face: Color,
+    val ringUpper: Color,
+    val ringLower: Color,
+    val glow: Color,
+    val horizon: Color,
+    val ink: Color
 )
 
 object HudColors {
@@ -128,4 +174,14 @@ object HudColors {
     val TachTrack: Color get() = scheme.tachTrack
     val TachFill: Color get() = scheme.tachFill
     val LampOff: Color get() = scheme.lampOff
+
+    val Attitude: AttitudePalette
+        get() = AttitudePalette(
+            face = scheme.attitudeFace,
+            ringUpper = scheme.attitudeRingUpper,
+            ringLower = scheme.attitudeRingLower,
+            glow = scheme.attitudeGlow,
+            horizon = scheme.attitudeHorizon,
+            ink = scheme.attitudeInk
+        )
 }

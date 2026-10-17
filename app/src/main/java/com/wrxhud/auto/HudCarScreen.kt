@@ -71,9 +71,9 @@ class HudCarScreen(carContext: CarContext) : Screen(carContext) {
         }
         if (GaugeId.BOOST in prefs.enabledGauges) {
             val boostLabel = when {
-                snap.boostPsi == null -> "BOOST"
-                snap.boostPsi > 0f -> "BOOST"
-                else -> "VACUUM"
+                snap.boostPsi == null -> "BST"
+                snap.boostPsi > 0f -> "BST"
+                else -> "VAC"
             }
             addRow(
                 boostLabel,
@@ -82,19 +82,19 @@ class HudCarScreen(carContext: CarContext) : Screen(carContext) {
         }
         if (GaugeId.COOLANT in prefs.enabledGauges) {
             addRow(
-                "COOLANT",
+                "CLT",
                 "${UnitConverters.formatTemp(snap.coolantC, useF)}${if (useF) "°F" else "°C"}"
             )
         }
         if (GaugeId.OIL_TEMP in prefs.enabledGauges) {
             addRow(
-                "OIL TEMP",
+                "OIL°",
                 "${UnitConverters.formatTemp(snap.oilTempC, useF)}${if (useF) "°F" else "°C"}"
             )
         }
         if (GaugeId.OIL_PRESSURE in prefs.enabledGauges) {
             addRow(
-                "OIL PSI",
+                "OIL#",
                 "${UnitConverters.formatPressure(snap.oilPressurePsi, prefs.pressureUnit)} ${prefs.pressureUnit.name}"
             )
         }

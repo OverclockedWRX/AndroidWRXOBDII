@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,6 +19,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.vehicle.AlarmEvaluator
@@ -56,33 +56,39 @@ fun GaugeTile(
 
     Column(
         modifier = modifier
-            .widthIn(min = 100.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(HudColors.Panel)
             .border(1.dp, HudColors.Border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 6.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = label,
             color = HudColors.TextDim,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false,
+            overflow = TextOverflow.Clip
         )
         Text(
             text = valueText,
             color = valueColor,
-            fontSize = 28.sp,
+            fontSize = 24.sp,
             fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false
         )
         Text(
             text = unit,
             color = HudColors.TextDim,
-            fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace
+            fontSize = 9.sp,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }
@@ -99,9 +105,9 @@ fun BoostVacTile(
 ) {
     val inBoost = psi != null && psi > 0f
     val label = when {
-        psi == null -> "BOOST"
-        inBoost -> "BOOST"
-        else -> "VACUUM"
+        psi == null -> "BST"
+        inBoost -> "BST"
+        else -> "VAC"
     }
     val flashOn by produceState(initialValue = true, severity) {
         if (severity == AlarmEvaluator.Severity.CRITICAL) {
@@ -129,33 +135,38 @@ fun BoostVacTile(
 
     Column(
         modifier = modifier
-            .widthIn(min = 100.dp)
             .clip(shape)
             .background(panelColor, shape)
             .border(1.dp, borderColor, shape)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 6.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = label,
             color = if (inBoost) HudColors.BoostBlue else HudColors.TextDim,
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Medium
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            softWrap = false
         )
         Text(
             text = UnitConverters.formatPressure(psi, unit),
             color = valueColor,
-            fontSize = 28.sp,
+            fontSize = 24.sp,
             fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false
         )
         Text(
             text = unit.name,
             color = HudColors.TextDim,
-            fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace
+            fontSize = 9.sp,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }
@@ -172,38 +183,44 @@ fun SpeedTile(
             .clip(RoundedCornerShape(8.dp))
             .background(HudColors.Panel)
             .border(1.dp, HudColors.Border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = label,
             color = HudColors.TextDim,
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            softWrap = false
         )
         // Reserve width for three digits so 9↔99↔100 does not reflow the HUD.
         Box(contentAlignment = Alignment.Center) {
             Text(
                 text = "000",
                 color = Color.Transparent,
-                fontSize = 48.sp,
+                fontSize = 40.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = value,
                 color = HudColors.TextPrimary,
-                fontSize = 48.sp,
+                fontSize = 40.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                softWrap = false
             )
         }
         Text(
             text = unit,
             color = HudColors.TextDim,
-            fontSize = 12.sp,
-            fontFamily = FontFamily.Monospace
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            softWrap = false
         )
     }
 }

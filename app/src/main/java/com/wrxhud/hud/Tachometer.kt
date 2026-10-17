@@ -103,9 +103,9 @@ fun Tachometer(
     }
 
     val tachHeight = when {
-        motionDisplayMode == MotionDisplayMode.TEXT -> 130.dp
-        motionVisibility.anyVisible -> 168.dp
-        else -> 148.dp
+        motionDisplayMode == MotionDisplayMode.TEXT -> 120.dp
+        motionVisibility.anyVisible -> 136.dp
+        else -> 132.dp
     }
 
     Row(

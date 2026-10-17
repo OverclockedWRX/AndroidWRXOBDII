@@ -75,7 +75,7 @@ class SpeedLimitProvider(
                     return@collectLatest
                 }
                 if (apiKey.isEmpty()) {
-                    _reading.value = SpeedLimitReading(status = "Add Maps API key")
+                    _reading.value = SpeedLimitReading(status = "NO KEY")
                     resetCache()
                     return@collectLatest
                 }
@@ -87,7 +87,7 @@ class SpeedLimitProvider(
                     val lng = g.longitude
                     if (!g.hasFix || lat == null || lng == null) {
                         if (_reading.value.limit == null) {
-                            _reading.value = SpeedLimitReading(unit = speedUnit, status = "Waiting for GPS")
+                            _reading.value = SpeedLimitReading(unit = speedUnit, status = "NO GPS")
                         }
                         delay(2_000L)
                         continue
@@ -131,7 +131,7 @@ class SpeedLimitProvider(
                     limit = _reading.value.limit,
                     unit = unit,
                     placeId = lastPlaceId,
-                    status = t.message?.take(48) ?: "Lookup failed"
+                    status = "ERR"
                 )
             }
         )
@@ -142,12 +142,12 @@ class SpeedLimitProvider(
         val nearestUrl = "$NEAREST_URL?points=${enc(points)}&key=${enc(apiKey)}"
         val nearestJson = httpGetJson(nearestUrl)
         val snapped = nearestJson.optJSONArray("snappedPoints")
-            ?: return SpeedLimitReading(unit = unit, status = "No road nearby")
+            ?: return SpeedLimitReading(unit = unit, status = "NO RD")
         if (snapped.length() == 0) {
-            return SpeedLimitReading(unit = unit, status = "No road nearby")
+            return SpeedLimitReading(unit = unit, status = "NO RD")
         }
         val placeId = snapped.getJSONObject(0).optString("placeId").takeIf { it.isNotBlank() }
-            ?: return SpeedLimitReading(unit = unit, status = "No road nearby")
+            ?: return SpeedLimitReading(unit = unit, status = "NO RD")
 
         if (placeId == lastPlaceId && _reading.value.limit != null && _reading.value.unit == unit) {
             return _reading.value.copy(status = null)
@@ -164,7 +164,7 @@ class SpeedLimitProvider(
             return SpeedLimitReading(
                 unit = unit,
                 placeId = placeId,
-                status = err.ifBlank { "No limit data" }.take(48)
+                status = if (err.isBlank()) "N/A" else "ERR"
             )
         }
         val entry = limits.getJSONObject(0)
@@ -173,7 +173,7 @@ class SpeedLimitProvider(
             limit = limit,
             unit = unit,
             placeId = placeId,
-            status = if (limit == null) "No limit data" else null
+            status = if (limit == null) "N/A" else null
         )
     }
 

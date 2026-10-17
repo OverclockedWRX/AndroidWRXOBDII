@@ -56,6 +56,7 @@ fun HudScreen(
                 .background(HudColors.Background)
                 .padding(8.dp)
         ) {
+            Column(modifier = Modifier.weight(1f).fillMaxWidth()) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
@@ -77,7 +78,7 @@ fun HudScreen(
                 }
             }
 
-            Spacer(Modifier.height(4.dp))
+            Spacer(Modifier.height(2.dp))
 
             if (GaugeId.RPM in preferences.enabledGauges || GaugeId.GEAR in preferences.enabledGauges) {
                 Tachometer(
@@ -99,20 +100,20 @@ fun HudScreen(
                 )
             }
 
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
 
             val helixOwnsBoost = preferences.tachVisualStyle == TachVisualStyle.HELIX
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 if (GaugeId.SPEED in preferences.enabledGauges) {
                     SpeedTile(
-                        label = "SPEED",
+                        label = "SPD",
                         value = UnitConverters.formatSpeed(snapshot.gpsSpeedMps, useMph),
-                        unit = if (useMph) "MPH GPS" else "KM/H GPS"
+                        unit = if (useMph) "MPH" else "KM/H"
                     )
                 }
                 if (preferences.showSpeedLimit) {
@@ -121,11 +122,11 @@ fun HudScreen(
 
                 Row(
                     modifier = Modifier.weight(1f),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     if (GaugeId.COOLANT in preferences.enabledGauges) {
                         GaugeTile(
-                            label = "COOLANT",
+                            label = "CLT",
                             valueText = UnitConverters.formatTemp(snapshot.coolantC, useF),
                             unit = if (useF) "°F" else "°C",
                             severity = AlarmEvaluator.severityForCoolant(snapshot.coolantC, thresholds),
@@ -134,7 +135,7 @@ fun HudScreen(
                     }
                     if (GaugeId.OIL_TEMP in preferences.enabledGauges) {
                         GaugeTile(
-                            label = "OIL TEMP",
+                            label = "OIL°",
                             valueText = UnitConverters.formatTemp(snapshot.oilTempC, useF),
                             unit = if (useF) "°F" else "°C",
                             severity = AlarmEvaluator.severityForOilTemp(snapshot.oilTempC, thresholds),
@@ -143,7 +144,7 @@ fun HudScreen(
                     }
                     if (GaugeId.OIL_PRESSURE in preferences.enabledGauges) {
                         GaugeTile(
-                            label = "OIL PSI",
+                            label = "OIL#",
                             valueText = UnitConverters.formatPressure(
                                 snapshot.oilPressurePsi,
                                 preferences.pressureUnit
@@ -198,20 +199,19 @@ fun HudScreen(
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(6.dp))
 
             WarningLamps(
                 alarms = snapshot.alarms,
                 enabled = preferences.enabledLamps,
                 modifier = Modifier.fillMaxWidth()
             )
-
-            Spacer(Modifier.weight(1f))
+            } // end weight(1f) content
 
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp),
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.Bottom
             ) {
@@ -227,13 +227,15 @@ fun HudScreen(
                     color = HudColors.TextDim,
                     fontSize = 11.sp,
                     fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1
                 )
                 Text(
                     text = "WRX VB FA24  2022+",
                     color = HudColors.TextDim,
                     fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace
+                    fontFamily = FontFamily.Monospace,
+                    maxLines = 1
                 )
             }
         }
