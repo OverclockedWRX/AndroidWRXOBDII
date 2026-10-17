@@ -2,6 +2,7 @@ package com.wrxhud.settings
 
 import com.wrxhud.gps.GpsSourceMode
 import com.wrxhud.obd.PidAssignment
+import com.wrxhud.obd.PidScanLogEntry
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -96,6 +97,10 @@ data class HudPreferences(
     val googleMapsApiKey: String = "",
     /** User PID/DID mappings from the scanner; empty = auto discovery defaults. */
     val pidAssignments: List<PidAssignment> = emptyList(),
+    /** Cumulative catalog of scanned PIDs/DIDs for reference (Settings → PID Log). */
+    val pidScanLog: List<PidScanLogEntry> = emptyList(),
+    /** Epoch ms of the most recent PID scan that updated [pidScanLog]. */
+    val pidScanLogAtMs: Long = 0L,
     val coolantAmberC: Float = 105f,
     val coolantRedC: Float = 115f,
     val oilTempAmberC: Float = 120f,

@@ -55,6 +55,7 @@ private enum class SettingsTab(val label: String) {
     SOURCE("Source"),
     LOOK("Look"),
     PIDS("PIDs"),
+    PID_LOG("PID Log"),
     GAUGES("Gauges"),
     LAMPS("Lamps"),
     UNITS("Units"),
@@ -167,6 +168,10 @@ fun SettingsScreen(
                     onUpdate = onUpdate,
                     onScanPids = onScanPids
                 )
+                SettingsTab.PID_LOG -> PidScanLogSection(
+                    preferences = preferences,
+                    onUpdate = onUpdate
+                )
                 SettingsTab.GAUGES -> GaugesTab(preferences, onUpdate)
                 SettingsTab.LAMPS -> LampsTab(preferences, onUpdate)
                 SettingsTab.UNITS -> UnitsTab(preferences, onUpdate)
@@ -238,7 +243,7 @@ private fun SourceTab(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Posted limit from OpenStreetMap Overpass mirrors (cached on-device). Untagged roads show N/A.",
+                "Posted limit from OpenStreetMap Overpass. Untagged roads show N/A.",
                 color = HudColors.TextDim,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
@@ -250,6 +255,7 @@ private fun SourceTab(
             onCheckedChange = { checked -> onUpdate { it.copy(showSpeedLimit = checked) } }
         )
     }
+    SpeedLimitRequirementWarning()
 }
 
 @Composable

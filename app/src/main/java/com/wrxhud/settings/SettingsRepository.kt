@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.wrxhud.gps.GpsSourceMode
 import com.wrxhud.obd.PidAssignment
+import com.wrxhud.obd.PidScanLogEntry
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
@@ -69,6 +70,8 @@ class SettingsRepository(private val context: Context) {
         val oilPressureAmber = floatPreferencesKey("oil_pressure_amber")
         val oilPressureRed = floatPreferencesKey("oil_pressure_red")
         val pidAssignments = stringPreferencesKey("pid_assignments")
+        val pidScanLog = stringPreferencesKey("pid_scan_log")
+        val pidScanLogAt = stringPreferencesKey("pid_scan_log_at")
     }
 
     val preferencesFlow: Flow<HudPreferences> = context.dataStore.data.map { it.toHudPreferences() }
@@ -121,6 +124,8 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.oilPressureAmber] = next.oilPressureAmberPsi
             prefs[Keys.oilPressureRed] = next.oilPressureRedPsi
             prefs[Keys.pidAssignments] = next.pidAssignments.joinToString(";") { it.encode() }
+            prefs[Keys.pidScanLog] = next.pidScanLog.joinToString(";") { it.encode() }
+            prefs[Keys.pidScanLogAt] = next.pidScanLogAtMs.toString()
         }
     }
 
@@ -200,7 +205,14 @@ class SettingsRepository(private val context: Context) {
                 ?.split(";")
                 ?.mapNotNull { PidAssignment.decode(it.trim()) }
                 ?.takeIf { it.isNotEmpty() }
-                ?: defaults.pidAssignments
+                ?: defaults.pidAssignments,
+            pidScanLog = this[Keys.pidScanLog]
+                ?.split(";")
+                ?.mapNotNull { PidScanLogEntry.decode(it.trim()) }
+                ?.takeIf { it.isNotEmpty() }
+                ?: defaults.pidScanLog,
+            pidScanLogAtMs = this[Keys.pidScanLogAt]?.toLongOrNull()
+                ?: defaults.pidScanLogAtMs
         )
     }
 }

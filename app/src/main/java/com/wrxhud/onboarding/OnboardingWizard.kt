@@ -44,6 +44,7 @@ import com.wrxhud.settings.HudPreferences
 import com.wrxhud.settings.MotionDisplayMode
 import com.wrxhud.settings.PidScanSection
 import com.wrxhud.settings.ShiftLightPattern
+import com.wrxhud.settings.SpeedLimitRequirementWarning
 import com.wrxhud.settings.TachVisualStyle
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
@@ -255,7 +256,7 @@ private fun DataSourcePage(
         Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
             Text("Show speed limit", color = HudColors.TextPrimary, fontFamily = FontFamily.Monospace)
             Text(
-                "Posted limit from OpenStreetMap (cached).",
+                "Posted limit from OpenStreetMap.",
                 color = HudColors.TextDim,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace
@@ -266,6 +267,8 @@ private fun DataSourcePage(
             onCheckedChange = { checked -> onUpdate { it.copy(showSpeedLimit = checked) } }
         )
     }
+    Spacer(Modifier.height(8.dp))
+    SpeedLimitRequirementWarning()
 }
 
 @Composable

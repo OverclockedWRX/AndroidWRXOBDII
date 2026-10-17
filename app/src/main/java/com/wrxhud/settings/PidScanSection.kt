@@ -26,14 +26,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.hud.HudColors
+import com.wrxhud.logging.PidScanFileLogger
 import com.wrxhud.obd.MappableSignal
 import com.wrxhud.obd.PidAssignment
 import com.wrxhud.obd.PidDecode
+import com.wrxhud.obd.PidScanLogEntry
 import com.wrxhud.obd.PidScanRow
 import kotlinx.coroutines.launch
 
@@ -46,6 +49,7 @@ fun PidScanSection(
     /** When true and link looks live, run one automatic scan. */
     autoScanWhenConnected: Boolean = false
 ) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var scanning by remember { mutableStateOf(false) }
     var rows by remember { mutableStateOf<List<PidScanRow>>(emptyList()) }
@@ -54,6 +58,23 @@ fun PidScanSection(
 
     val looksConnected = !preferences.useSimulator &&
         connectionStatus.contains("Connected", ignoreCase = true)
+
+    fun persistScan(result: List<PidScanRow>): String {
+        if (result.isEmpty()) {
+            return "No results — connect MX+ with simulator off ($connectionStatus)"
+        }
+        val at = System.currentTimeMillis()
+        val entries = result.map { it.toLogEntry(at) }
+        onUpdate { prefs ->
+            prefs.copy(
+                pidScanLog = PidScanLogEntry.merge(prefs.pidScanLog, entries),
+                pidScanLogAtMs = at
+            )
+        }
+        val file = PidScanFileLogger.write(context, result)
+        val fileNote = file?.let { " · saved Download/$it" }.orEmpty()
+        return "Found ${result.size} PIDs/DIDs · logged in Settings → PID Log$fileNote"
+    }
 
     LaunchedEffect(autoScanWhenConnected, looksConnected, preferences.useSimulator) {
         if (autoScanWhenConnected && looksConnected && !autoScanDone && !scanning) {
@@ -64,11 +85,7 @@ fun PidScanSection(
             val result = onScanPids()
             rows = result
             scanning = false
-            message = if (result.isEmpty()) {
-                "No results — retry Scan PIDs ($connectionStatus)"
-            } else {
-                "Found ${result.size} responding PIDs/DIDs — assign to gauges below"
-            }
+            message = persistScan(result)
         }
     }
 
@@ -116,11 +133,7 @@ fun PidScanSection(
                     val result = onScanPids()
                     rows = result
                     scanning = false
-                    message = if (result.isEmpty()) {
-                        "No results — connect MX+ with simulator off ($connectionStatus)"
-                    } else {
-                        "Found ${result.size} responding PIDs/DIDs"
-                    }
+                    message = persistScan(result)
                 }
             },
             enabled = !scanning && !preferences.useSimulator,
@@ -149,40 +162,84 @@ fun PidScanSection(
         )
     }
 
-    rows.forEach { row ->
-        PidScanRowCard(
-            row = row,
-            preferences = preferences,
-            onAssign = { signal, decode ->
-                onUpdate { prefs ->
-                    val without = prefs.pidAssignments.filterNot {
-                        it.signal == signal || (it.mode == row.mode && it.id == row.id)
-                    }
-                    val next = without + PidAssignment(
-                        signal = signal,
-                        mode = row.mode,
-                        id = row.id,
-                        decode = decode,
-                        header = row.header
-                    )
-                    val gauges = prefs.enabledGauges.toMutableSet()
-                    when (signal) {
-                        MappableSignal.OIL_PRESSURE -> gauges.add(com.wrxhud.vehicle.GaugeId.OIL_PRESSURE)
-                        MappableSignal.OIL_TEMP -> gauges.add(com.wrxhud.vehicle.GaugeId.OIL_TEMP)
-                        MappableSignal.AFR -> gauges.add(com.wrxhud.vehicle.GaugeId.AFR)
-                        else -> Unit
-                    }
-                    prefs.copy(pidAssignments = next, enabledGauges = gauges)
+    // Prefer the live scan while it is on screen; otherwise restore from the
+    // persisted catalog so leaving Settings / killing the app does not wipe results.
+    if (rows.isNotEmpty()) {
+        rows.forEach { row ->
+            PidScanRowCard(
+                row = row,
+                preferences = preferences,
+                onAssign = { signal, decode ->
+                    assignSignal(onUpdate, row.mode, row.id, row.header, signal, decode)
+                },
+                onClear = {
+                    clearAssignment(onUpdate, row.mode, row.id)
                 }
-            },
-            onClear = {
-                onUpdate { prefs ->
-                    prefs.copy(
-                        pidAssignments = prefs.pidAssignments.filterNot {
-                            it.mode == row.mode && it.id == row.id
-                        }
-                    )
+            )
+        }
+    } else if (preferences.pidScanLog.isNotEmpty()) {
+        Text(
+            text = "Restored ${preferences.pidScanLog.size} PIDs from last scan(s). " +
+                "Re-scan to refresh live values.",
+            color = HudColors.TextDim,
+            fontSize = 12.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(top = 4.dp)
+        )
+        preferences.pidScanLog.forEach { entry ->
+            PidLogEntryCard(
+                entry = entry,
+                preferences = preferences,
+                onAssign = { signal, decode ->
+                    assignSignal(onUpdate, entry.mode, entry.id, entry.header, signal, decode)
+                },
+                onClear = {
+                    clearAssignment(onUpdate, entry.mode, entry.id)
                 }
+            )
+        }
+    }
+}
+
+private fun assignSignal(
+    onUpdate: ((HudPreferences) -> HudPreferences) -> Unit,
+    mode: Int,
+    id: Int,
+    header: Int?,
+    signal: MappableSignal,
+    decode: PidDecode
+) {
+    onUpdate { prefs ->
+        val without = prefs.pidAssignments.filterNot {
+            it.signal == signal || (it.mode == mode && it.id == id)
+        }
+        val next = without + PidAssignment(
+            signal = signal,
+            mode = mode,
+            id = id,
+            decode = decode,
+            header = header
+        )
+        val gauges = prefs.enabledGauges.toMutableSet()
+        when (signal) {
+            MappableSignal.OIL_PRESSURE -> gauges.add(com.wrxhud.vehicle.GaugeId.OIL_PRESSURE)
+            MappableSignal.OIL_TEMP -> gauges.add(com.wrxhud.vehicle.GaugeId.OIL_TEMP)
+            MappableSignal.AFR -> gauges.add(com.wrxhud.vehicle.GaugeId.AFR)
+            else -> Unit
+        }
+        prefs.copy(pidAssignments = next, enabledGauges = gauges)
+    }
+}
+
+private fun clearAssignment(
+    onUpdate: ((HudPreferences) -> HudPreferences) -> Unit,
+    mode: Int,
+    id: Int
+) {
+    onUpdate { prefs ->
+        prefs.copy(
+            pidAssignments = prefs.pidAssignments.filterNot {
+                it.mode == mode && it.id == id
             }
         )
     }
