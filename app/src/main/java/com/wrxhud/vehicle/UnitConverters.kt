@@ -54,6 +54,11 @@ object UnitConverters {
         return "%.0f".format(rpm)
     }
 
+    fun formatPercent(percent: Float?): String {
+        if (percent == null) return "—"
+        return "%.0f".format(percent.coerceIn(0f, 100f))
+    }
+
     fun formatGear(gear: Int?): String = when (gear) {
         null -> "N"
         -1 -> "R"

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -177,25 +178,79 @@ fun SpeedTile(
     value: String,
     unit: String,
     modifier: Modifier = Modifier,
-    /** Compact sizing for the tach row (beside gear). */
+    /** Same outer box as [GearIndicator] when true (tach row). */
     compact: Boolean = false
 ) {
-    val valueSp = if (compact) 28.sp else 40.sp
-    val labelSp = if (compact) 9.sp else 10.sp
-    val hPad = if (compact) 8.dp else 10.dp
-    val vPad = if (compact) 4.dp else 6.dp
+    if (compact) {
+        // Match GearIndicator compact: 96×108 box + GEAR-style caption above.
+        val shape = RoundedCornerShape(10.dp)
+        Column(
+            modifier = modifier,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = label,
+                color = HudColors.TextDim,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(bottom = 4.dp),
+                maxLines = 1,
+                softWrap = false
+            )
+            Box(
+                modifier = Modifier
+                    .size(width = 96.dp, height = 108.dp)
+                    .clip(shape)
+                    .background(HudColors.Panel, shape)
+                    .border(2.dp, HudColors.Border, shape),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "000",
+                            color = Color.Transparent,
+                            fontSize = 48.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = value,
+                            color = HudColors.TextPrimary,
+                            fontSize = 48.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                    Text(
+                        text = unit,
+                        color = HudColors.TextDim,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
+        }
+        return
+    }
+
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .background(HudColors.Panel)
             .border(1.dp, HudColors.Border, RoundedCornerShape(8.dp))
-            .padding(horizontal = hPad, vertical = vPad),
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = label,
             color = HudColors.TextDim,
-            fontSize = labelSp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false
@@ -205,14 +260,14 @@ fun SpeedTile(
             Text(
                 text = "000",
                 color = Color.Transparent,
-                fontSize = valueSp,
+                fontSize = 40.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = value,
                 color = HudColors.TextPrimary,
-                fontSize = valueSp,
+                fontSize = 40.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -223,7 +278,7 @@ fun SpeedTile(
         Text(
             text = unit,
             color = HudColors.TextDim,
-            fontSize = labelSp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false

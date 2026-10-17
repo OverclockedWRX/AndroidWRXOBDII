@@ -29,6 +29,7 @@ data class HudPreferences(
     val onboardingComplete: Boolean = false,
     val enabledGauges: Set<GaugeId> = setOf(
         GaugeId.RPM,
+        GaugeId.THROTTLE,
         GaugeId.SPEED,
         GaugeId.GEAR,
         GaugeId.COOLANT,

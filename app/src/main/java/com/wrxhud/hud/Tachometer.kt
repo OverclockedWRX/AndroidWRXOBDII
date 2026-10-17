@@ -44,6 +44,7 @@ import kotlin.math.min
  * Full-width bar tach with frame-timed interpolation and zone coloring
  * (blue → green → amber → red toward redline), AiM-style.
  * Visual style: enhanced 3D bar, liquid water, or RPM+boost double helix.
+ * Optional throttle pedal % mirrors the RPM numeral + bar stack underneath.
  * Optional SPD / LIM sit to the left of the gear box.
  */
 @Composable
@@ -59,6 +60,9 @@ fun Tachometer(
     visualStyle: TachVisualStyle = TachVisualStyle.BAR_3D,
     boostPsi: Float? = null,
     maxBoostPsi: Float = 22f,
+    /** Pedal / throttle position 0–100 (null → "—" when [showThrottle]). */
+    throttlePercent: Float? = null,
+    showThrottle: Boolean = false,
     /** Formatted speed digits; null hides the SPD tile. */
     speedValue: String? = null,
     speedUnit: String = "MPH",
@@ -90,9 +94,35 @@ fun Tachometer(
         }
     }
 
+    var displayThrottle by remember { mutableFloatStateOf(throttlePercent ?: 0f) }
+    var previousThrottle by remember { mutableFloatStateOf(throttlePercent ?: 0f) }
+    LaunchedEffect(throttlePercent) {
+        val target = throttlePercent ?: return@LaunchedEffect
+        val from = previousThrottle
+        previousThrottle = target
+        val spanNs = 80_000_000L
+        val startNs = withFrameNanos { it }
+        while (true) {
+            val now = withFrameNanos { it }
+            val t = ((now - startNs).toFloat() / spanNs).coerceIn(0f, 1f)
+            displayThrottle = from + (target - from) * t
+            if (t >= 1f) {
+                displayThrottle = target
+                break
+            }
+        }
+    }
+
     val rpmColor = when {
         displayRpm >= redline -> HudColors.Red
         displayRpm >= redStart -> HudColors.Amber
+        else -> HudColors.TextPrimary
+    }
+
+    val throttleColor = when {
+        throttlePercent == null -> HudColors.TextDim
+        displayThrottle >= 90f -> HudColors.Red
+        displayThrottle >= 70f -> HudColors.Amber
         else -> HudColors.TextPrimary
     }
 
@@ -120,11 +150,14 @@ fun Tachometer(
     }
 
     val sideCluster = speedValue != null || speedLimit != null || showGear
-    val tachHeight = when {
+    val baseHeight = when {
         motionDisplayMode == MotionDisplayMode.TEXT -> if (sideCluster) 112.dp else 120.dp
         motionVisibility.anyVisible -> if (sideCluster) 124.dp else 136.dp
         else -> if (sideCluster) 120.dp else 132.dp
     }
+    val tachHeight = if (showThrottle) baseHeight + 72.dp else baseHeight
+    val valueSp = if (sideCluster) 34.sp else 48.sp
+    val labelSp = if (sideCluster) 10.sp else 11.sp
 
     Row(
         modifier = modifier
@@ -146,16 +179,16 @@ fun Tachometer(
             ) {
                 Column {
                     Text(
-                        text = UnitConverters.formatRpm(displayRpm),
+                        text = UnitConverters.formatRpm(if (rpm != null) displayRpm else null),
                         color = rpmColor,
-                        fontSize = if (sideCluster) 34.sp else 48.sp,
+                        fontSize = valueSp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
                         text = "RPM",
                         color = HudColors.TextDim,
-                        fontSize = if (sideCluster) 10.sp else 11.sp,
+                        fontSize = labelSp,
                         fontFamily = FontFamily.Monospace
                     )
                 }
@@ -267,6 +300,72 @@ fun Tachometer(
                                 border = border
                             )
                         }
+                    }
+                }
+            }
+
+            if (showThrottle) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = UnitConverters.formatPercent(throttlePercent?.let { displayThrottle }),
+                    color = throttleColor,
+                    fontSize = valueSp,
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = FontFamily.Monospace
+                )
+                Text(
+                    text = "Throttle",
+                    color = HudColors.TextDim,
+                    fontSize = labelSp,
+                    fontFamily = FontFamily.Monospace
+                )
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(28.dp)
+                ) {
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        val maxT = 100f
+                        val tBlue = 40f
+                        val tGreen = 65f
+                        val tAmber = 80f
+                        val tRed = 92f
+                        val fraction = min(displayThrottle / maxT, 1f)
+                        val depth = size.height * 0.28f
+                        val trackHeight = size.height * 0.52f
+                        val top = (size.height - trackHeight - depth) / 2f
+                        val trackWidth = size.width - depth
+                        val fillWidth = trackWidth * fraction
+                        val tachStops = arrayOf(
+                            0f to blue,
+                            (tBlue / maxT) to blue,
+                            (tGreen / maxT) to green,
+                            (tAmber / maxT) to green,
+                            (tRed / maxT) to amber,
+                            1f to red
+                        )
+                        drawTach3dEnhanced(
+                            top = top,
+                            trackHeight = trackHeight,
+                            trackWidth = trackWidth,
+                            depth = depth,
+                            fillWidth = fillWidth,
+                            blueX = trackWidth * (tBlue / maxT),
+                            greenX = trackWidth * (tGreen / maxT),
+                            amberX = trackWidth * (tAmber / maxT),
+                            redX = trackWidth * (tRed / maxT),
+                            redlineX = trackWidth,
+                            tachStops = tachStops,
+                            trackColor = trackColor,
+                            blue = blue,
+                            green = green,
+                            amber = amber,
+                            red = red,
+                            accent = accent,
+                            panel = panel,
+                            border = border
+                        )
                     }
                 }
             }

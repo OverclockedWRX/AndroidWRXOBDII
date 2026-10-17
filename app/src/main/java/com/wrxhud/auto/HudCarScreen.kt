@@ -62,6 +62,10 @@ class HudCarScreen(carContext: CarContext) : Screen(carContext) {
         if (GaugeId.RPM in prefs.enabledGauges) {
             addRow("RPM", UnitConverters.formatRpm(snap.rpm))
         }
+        if (GaugeId.THROTTLE in prefs.enabledGauges) {
+            val pedal = snap.acceleratorPercent ?: snap.throttlePercent
+            addRow("Throttle", UnitConverters.formatPercent(pedal))
+        }
         if (GaugeId.GEAR in prefs.enabledGauges) {
             addRow("GEAR", UnitConverters.formatGear(snap.gear))
         }

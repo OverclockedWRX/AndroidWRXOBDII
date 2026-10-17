@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -32,32 +33,98 @@ private val SignBorder = Color(0xFF1A1A1A)
 fun SpeedLimitSign(
     reading: SpeedLimitReading,
     modifier: Modifier = Modifier,
+    /** Same outer box as [GearIndicator] when true (tach row). */
     compact: Boolean = false
 ) {
-    val shape = RoundedCornerShape(6.dp)
     val valueText = reading.limit?.toString() ?: "—"
     val unitHint = when (reading.unit) {
         SpeedUnit.MPH -> "MPH"
         SpeedUnit.KPH -> "KM/H"
     }
-    val valueSp = if (compact) 22.sp else 28.sp
-    val limSp = if (compact) 9.sp else 10.sp
-    val minW = if (compact) 44.dp else 52.dp
-    val maxW = if (compact) 60.dp else 72.dp
+    val footer = if (reading.limit != null) unitHint else (reading.status ?: unitHint)
 
+    if (compact) {
+        // Match GearIndicator compact: caption above + 96×108 sign face.
+        val shape = RoundedCornerShape(10.dp)
+        Column(
+            modifier = modifier,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = "LIM",
+                color = HudColors.TextDim,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(bottom = 4.dp),
+                maxLines = 1,
+                softWrap = false
+            )
+            Box(
+                modifier = Modifier
+                    .size(width = 96.dp, height = 108.dp)
+                    .clip(shape)
+                    .background(SignWhite, shape)
+                    .border(2.dp, SignBorder, shape),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = "LIMIT",
+                        color = SignBlack,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "000",
+                            color = Color.Transparent,
+                            fontSize = 48.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = valueText,
+                            color = SignBlack,
+                            fontSize = 48.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            softWrap = false
+                        )
+                    }
+                    Text(
+                        text = footer,
+                        color = SignBlack.copy(alpha = 0.7f),
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1,
+                        softWrap = false
+                    )
+                }
+            }
+        }
+        return
+    }
+
+    val shape = RoundedCornerShape(6.dp)
     Column(
         modifier = modifier
-            .widthIn(min = minW, max = maxW)
+            .widthIn(min = 52.dp, max = 72.dp)
             .clip(shape)
             .background(SignWhite, shape)
             .border(2.dp, SignBorder, shape)
-            .padding(horizontal = if (compact) 4.dp else 6.dp, vertical = if (compact) 3.dp else 4.dp),
+            .padding(horizontal = 6.dp, vertical = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "LIM",
             color = SignBlack,
-            fontSize = limSp,
+            fontSize = 10.sp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp,
@@ -68,14 +135,14 @@ fun SpeedLimitSign(
             Text(
                 text = "000",
                 color = Color.Transparent,
-                fontSize = valueSp,
+                fontSize = 28.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = valueText,
                 color = SignBlack,
-                fontSize = valueSp,
+                fontSize = 28.sp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -84,9 +151,9 @@ fun SpeedLimitSign(
             )
         }
         Text(
-            text = if (reading.limit != null) unitHint else (reading.status ?: unitHint),
+            text = footer,
             color = SignBlack.copy(alpha = 0.7f),
-            fontSize = if (compact) 7.sp else 8.sp,
+            fontSize = 8.sp,
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false

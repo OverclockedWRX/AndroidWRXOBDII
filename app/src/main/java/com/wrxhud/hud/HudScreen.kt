@@ -84,6 +84,7 @@ fun HudScreen(
             Spacer(Modifier.height(2.dp))
 
             val showTachRow = GaugeId.RPM in preferences.enabledGauges ||
+                GaugeId.THROTTLE in preferences.enabledGauges ||
                 GaugeId.GEAR in preferences.enabledGauges ||
                 GaugeId.SPEED in preferences.enabledGauges ||
                 preferences.showSpeedLimit
@@ -91,6 +92,8 @@ fun HudScreen(
             if (showTachRow) {
                 val speedMps = snapshot.gpsSpeedMps
                     ?: snapshot.obdSpeedKph?.let { UnitConverters.kphToMps(it) }
+                // Prefer accelerator pedal %; fall back to absolute throttle plate.
+                val pedalPct = snapshot.acceleratorPercent ?: snapshot.throttlePercent
                 Tachometer(
                     rpm = if (GaugeId.RPM in preferences.enabledGauges) snapshot.rpm else null,
                     previousRpm = snapshot.previousRpm,
@@ -107,6 +110,8 @@ fun HudScreen(
                     visualStyle = preferences.tachVisualStyle,
                     boostPsi = snapshot.boostPsi,
                     maxBoostPsi = preferences.boostRedPsi,
+                    throttlePercent = if (GaugeId.THROTTLE in preferences.enabledGauges) pedalPct else null,
+                    showThrottle = GaugeId.THROTTLE in preferences.enabledGauges,
                     speedValue = if (GaugeId.SPEED in preferences.enabledGauges) {
                         if (speedMps != null) UnitConverters.formatSpeed(speedMps, useMph) else ""
                     } else {

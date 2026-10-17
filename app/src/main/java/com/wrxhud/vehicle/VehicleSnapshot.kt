@@ -80,6 +80,7 @@ data class AlarmState(
 
 enum class GaugeId {
     RPM,
+    THROTTLE,
     SPEED,
     GEAR,
     COOLANT,
