@@ -65,7 +65,10 @@ class MainActivity : ComponentActivity() {
                     !ui.preferences.onboardingComplete -> {
                         OnboardingWizard(
                             preferences = ui.preferences,
+                            connectionStatus = ui.connectionStatus,
                             onUpdate = viewModel::updatePreferences,
+                            onEnsureObd = viewModel::ensureObdForSetup,
+                            onScanPids = { viewModel.scanPids() },
                             onRequestPermissions = { requestNeededPermissions() },
                             onFinished = { }
                         )

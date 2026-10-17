@@ -17,6 +17,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -41,12 +42,35 @@ fun PidScanSection(
     preferences: HudPreferences,
     connectionStatus: String,
     onUpdate: ((HudPreferences) -> HudPreferences) -> Unit,
-    onScanPids: suspend () -> List<PidScanRow>
+    onScanPids: suspend () -> List<PidScanRow>,
+    /** When true and link looks live, run one automatic scan. */
+    autoScanWhenConnected: Boolean = false
 ) {
     val scope = rememberCoroutineScope()
     var scanning by remember { mutableStateOf(false) }
     var rows by remember { mutableStateOf<List<PidScanRow>>(emptyList()) }
     var message by remember { mutableStateOf<String?>(null) }
+    var autoScanDone by remember { mutableStateOf(false) }
+
+    val looksConnected = !preferences.useSimulator &&
+        connectionStatus.contains("Connected", ignoreCase = true)
+
+    LaunchedEffect(autoScanWhenConnected, looksConnected, preferences.useSimulator) {
+        if (autoScanWhenConnected && looksConnected && !autoScanDone && !scanning) {
+            autoScanDone = true
+            scanning = true
+            message = "OBDLink connected — scanning PIDs…"
+            rows = emptyList()
+            val result = onScanPids()
+            rows = result
+            scanning = false
+            message = if (result.isEmpty()) {
+                "No results — retry Scan PIDs ($connectionStatus)"
+            } else {
+                "Found ${result.size} responding PIDs/DIDs — assign to gauges below"
+            }
+        }
+    }
 
     Text(
         text = "PID SCANNER",

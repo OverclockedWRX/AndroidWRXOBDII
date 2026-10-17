@@ -235,6 +235,17 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * Start / restart OBD during the setup wizard so a live MX+ can be scanned
+     * before onboarding + mount calibration complete.
+     */
+    fun ensureObdForSetup(useSimulator: Boolean) {
+        if (lastSimulatorSetting != useSimulator || service == null || !bound) {
+            lastSimulatorSetting = useSimulator
+            startObd(useSimulator)
+        }
+    }
+
     fun stopObd() {
         val app = getApplication<Application>()
         val intent = Intent(app, ObdService::class.java).apply {
@@ -279,7 +290,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
                 delay(100L)
             }
         }
-        android.util.Log.i("HudViewModel", "Data log → ${started.absolutePath}")
+        android.util.Log.i("HudViewModel", "Data log → Download/$started")
     }
 
     fun stopDataLog() {

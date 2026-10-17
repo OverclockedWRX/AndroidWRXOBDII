@@ -38,6 +38,7 @@ import com.wrxhud.settings.TachVisualStyle
 import com.wrxhud.vehicle.UnitConverters
 import kotlin.math.min
 
+
 /**
  * Full-width bar tach with frame-timed interpolation and zone coloring
  * (blue → green → amber → red toward redline), AiM-style.
@@ -56,8 +57,6 @@ fun Tachometer(
     visualStyle: TachVisualStyle = TachVisualStyle.BAR_3D,
     boostPsi: Float? = null,
     maxBoostPsi: Float = 22f,
-    logging: Boolean = false,
-    onToggleLogging: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val maxRpm = (redline + 500).coerceAtLeast(7000).toFloat()
@@ -130,10 +129,11 @@ fun Tachometer(
                 .weight(1f)
                 .fillMaxHeight()
         ) {
-            // Numerals left, REC in the middle gap, pitch/roll/G right — bar below.
+            // Numerals left, pitch/roll/G right — tach bar runs full-width below.
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom
+                verticalAlignment = Alignment.Bottom,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
                     Text(
@@ -150,23 +150,12 @@ fun Tachometer(
                         fontFamily = FontFamily.Monospace
                     )
                 }
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    DataLogRecordButton(
-                        logging = logging,
-                        onClick = onToggleLogging
-                    )
-                }
                 if (motion.available && motionVisibility.anyVisible) {
                     MotionAttitudeDisplay(
                         motion = motion,
                         mode = motionDisplayMode,
                         visibility = motionVisibility,
-                        modifier = Modifier.padding(start = 4.dp, bottom = 2.dp)
+                        modifier = Modifier.padding(start = 8.dp, bottom = 2.dp)
                     )
                 }
             }

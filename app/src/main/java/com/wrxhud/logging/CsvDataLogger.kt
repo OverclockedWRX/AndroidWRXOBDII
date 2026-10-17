@@ -1,6 +1,10 @@
 package com.wrxhud.logging
 
+import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Log
 import com.wrxhud.gps.SpeedLimitReading
 import com.wrxhud.sensors.MotionReading
@@ -10,16 +14,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.BufferedWriter
-import java.io.File
-import java.io.FileWriter
+import java.io.OutputStreamWriter
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 
 /**
- * Appends HUD telemetry rows to a CSV under app-specific external storage
- * (`Android/data/.../files/datalogs/`). No runtime storage permission required.
+ * Appends HUD telemetry rows to a CSV in the public Downloads folder
+ * (`Internal storage/Download/`) via MediaStore. Visible in Files / Downloads
+ * without a storage permission on Android 10+.
  */
 class CsvDataLogger(context: Context) {
     companion object {
@@ -83,48 +87,73 @@ class CsvDataLogger(context: Context) {
     val activeFileName: StateFlow<String?> = _activeFileName.asStateFlow()
 
     private var writer: BufferedWriter? = null
-    private var file: File? = null
+    private var mediaUri: Uri? = null
+    private var displayName: String? = null
 
-    fun logDir(): File {
-        val dir = File(appContext.getExternalFilesDir(null), "datalogs")
-        if (!dir.exists()) dir.mkdirs()
-        return dir
-    }
-
+    /**
+     * Starts a new log in Downloads. Returns the display file name on success.
+     */
     @Synchronized
-    fun start(): File? {
-        if (_recording.value) return file
+    fun start(): String? {
+        if (_recording.value) return displayName
         return runCatching {
             val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-            val out = File(logDir(), "wrx_log_$stamp.csv")
-            val w = BufferedWriter(FileWriter(out, false))
+            val name = "wrx_log_$stamp.csv"
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, "text/csv")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+            val resolver = appContext.contentResolver
+            val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+                ?: error("MediaStore insert returned null")
+            val stream = resolver.openOutputStream(uri, "w")
+                ?: error("Could not open Downloads output stream")
+            val w = BufferedWriter(OutputStreamWriter(stream, Charsets.UTF_8))
             w.write(HEADER)
             w.newLine()
             w.flush()
             writer = w
-            file = out
-            _activeFileName.value = out.name
+            mediaUri = uri
+            displayName = name
+            _activeFileName.value = name
             _recording.value = true
-            Log.i(TAG, "Logging started: ${out.absolutePath}")
-            out
+            Log.i(TAG, "Logging started: Download/$name ($uri)")
+            name
         }.onFailure { t ->
-            Log.e(TAG, "Failed to start log", t)
-            stopInternal()
+            Log.e(TAG, "Failed to start log in Downloads", t)
+            stopInternal(publish = false)
         }.getOrNull()
     }
 
     @Synchronized
-    fun stop(): File? {
-        val closed = file
-        stopInternal()
-        if (closed != null) Log.i(TAG, "Logging stopped: ${closed.absolutePath}")
-        return closed
+    fun stop(): String? {
+        val name = displayName
+        stopInternal(publish = true)
+        if (name != null) Log.i(TAG, "Logging stopped: Download/$name")
+        return name
     }
 
-    private fun stopInternal() {
+    private fun stopInternal(publish: Boolean) {
         runCatching { writer?.flush(); writer?.close() }
         writer = null
-        file = null
+        val uri = mediaUri
+        mediaUri = null
+        if (publish && uri != null) {
+            runCatching {
+                val done = ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+                appContext.contentResolver.update(uri, done, null, null)
+            }.onFailure { t ->
+                Log.w(TAG, "Failed to clear IS_PENDING on $uri", t)
+            }
+        } else if (!publish && uri != null) {
+            // Failed start — remove incomplete entry.
+            runCatching { appContext.contentResolver.delete(uri, null, null) }
+        }
+        displayName = null
         _recording.value = false
         _activeFileName.value = null
     }
@@ -188,7 +217,7 @@ class CsvDataLogger(context: Context) {
             w.newLine()
         }.onFailure { t ->
             Log.w(TAG, "Append failed", t)
-            stopInternal()
+            stopInternal(publish = true)
         }
     }
 

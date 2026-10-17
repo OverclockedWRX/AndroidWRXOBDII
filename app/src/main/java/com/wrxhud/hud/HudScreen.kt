@@ -99,9 +99,7 @@ fun HudScreen(
                     ),
                     visualStyle = preferences.tachVisualStyle,
                     boostPsi = snapshot.boostPsi,
-                    maxBoostPsi = preferences.boostRedPsi,
-                    logging = logging,
-                    onToggleLogging = onToggleLogging
+                    maxBoostPsi = preferences.boostRedPsi
                 )
             }
 
@@ -245,13 +243,20 @@ fun HudScreen(
                     modifier = Modifier.weight(1f),
                     maxLines = 1
                 )
-                Text(
-                    text = "WRX VB FA24  2022+",
-                    color = HudColors.TextDim,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1
-                )
+                Column(horizontalAlignment = Alignment.End) {
+                    DataLogRecordButton(
+                        logging = logging,
+                        onClick = onToggleLogging,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                    Text(
+                        text = "WRX VB FA24  2022+",
+                        color = HudColors.TextDim,
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        maxLines = 1
+                    )
+                }
             }
         }
     }
