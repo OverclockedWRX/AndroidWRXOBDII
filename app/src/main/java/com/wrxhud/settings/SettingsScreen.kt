@@ -238,7 +238,7 @@ private fun SourceTab(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Posted limit for the current road via Google Roads API (nearest road + speedLimits).",
+                "Posted limit from OpenStreetMap (Overpass). No API key. Untagged roads show N/A.",
                 color = HudColors.TextDim,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,
@@ -248,31 +248,6 @@ private fun SourceTab(
         Switch(
             checked = preferences.showSpeedLimit,
             onCheckedChange = { checked -> onUpdate { it.copy(showSpeedLimit = checked) } }
-        )
-    }
-    if (preferences.showSpeedLimit) {
-        Text(
-            "Requires a Maps Platform API key with Roads Speed Limits (Asset Tracking) enabled. Key stays on-device in app settings.",
-            color = HudColors.TextDim,
-            fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
-            lineHeight = 15.sp
-        )
-        OutlinedTextField(
-            value = preferences.googleMapsApiKey,
-            onValueChange = { value -> onUpdate { it.copy(googleMapsApiKey = value.trim()) } },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true,
-            label = { Text("Google Maps API key", fontFamily = FontFamily.Monospace) },
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = HudColors.TextPrimary,
-                unfocusedTextColor = HudColors.TextPrimary,
-                focusedBorderColor = HudColors.Accent,
-                unfocusedBorderColor = HudColors.Border,
-                focusedLabelColor = HudColors.Accent,
-                unfocusedLabelColor = HudColors.TextDim,
-                cursorColor = HudColors.Accent
-            )
         )
     }
 }
