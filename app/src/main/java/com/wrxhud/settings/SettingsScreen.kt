@@ -238,7 +238,7 @@ private fun SourceTab(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                "Posted limit from OpenStreetMap (Overpass). No API key. Untagged roads show N/A.",
+                "Posted limit from OpenStreetMap Overpass mirrors (cached on-device). Untagged roads show N/A.",
                 color = HudColors.TextDim,
                 fontSize = 11.sp,
                 fontFamily = FontFamily.Monospace,

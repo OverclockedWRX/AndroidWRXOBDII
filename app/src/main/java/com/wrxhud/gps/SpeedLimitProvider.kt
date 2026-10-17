@@ -1,5 +1,6 @@
 package com.wrxhud.gps
 
+import android.content.Context
 import android.util.Log
 import com.wrxhud.settings.HudPreferences
 import com.wrxhud.vehicle.SpeedUnit
@@ -37,26 +38,40 @@ data class SpeedLimitReading(
 )
 
 /**
- * Looks up posted speed limits from OpenStreetMap via the public Overpass API
+ * Looks up posted speed limits from OpenStreetMap via public Overpass mirrors
  * (`maxspeed` tags on nearby highways). No API key required.
  *
- * Coverage varies by region; untagged roads return N/A.
+ * Results are cached on-device so the last known limit still shows during outages.
  */
 class SpeedLimitProvider(
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
+    context: Context
 ) {
     companion object {
         private const val TAG = "SpeedLimit"
         private const val MIN_MOVE_M = 40.0
-        private const val POLL_INTERVAL_MS = 15_000L
-        private const val USER_AGENT = "WRXRaceHUD/0.17 (private; OSM Overpass speed-limit)"
+        private const val POLL_INTERVAL_MS = 12_000L
+        private const val SEARCH_RADIUS_M = 100
+        private const val CACHE_HIT_M = 80.0
+        private const val CACHE_TTL_MS = 7L * 24 * 60 * 60 * 1000
+        private const val CONNECT_TIMEOUT_MS = 15_000
+        private const val READ_TIMEOUT_MS = 15_000
+        private const val FALLBACK_CONNECT_MS = 5_000
+        private const val FALLBACK_READ_MS = 5_000
+        private const val USER_AGENT = "WRXRaceHUD/0.18 (private; OSM Overpass speed-limit)"
+
+        /** Fast mirrors first; private.coffee answered in ~0.5s in testing. */
         private val OVERPASS_ENDPOINTS = listOf(
+            "https://overpass.private.coffee/api/interpreter",
             "https://lz4.overpass-api.de/api/interpreter",
             "https://overpass-api.de/api/interpreter",
-            "https://overpass.osm.ch/api/interpreter"
+            "https://overpass.osm.ch/api/interpreter",
+            "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
         )
-        private val SEARCH_RADII_M = listOf(30, 60, 120)
     }
+
+    private val appContext = context.applicationContext
+    private val diskCache = SpeedLimitDiskCache(appContext)
 
     private val _reading = MutableStateFlow(SpeedLimitReading(status = "Off"))
     val reading: StateFlow<SpeedLimitReading> = _reading.asStateFlow()
@@ -65,6 +80,7 @@ class SpeedLimitProvider(
     private var lastLat: Double? = null
     private var lastLng: Double? = null
     private var lastPlaceId: String? = null
+    private var preferredEndpoint: String? = null
 
     fun start(
         gps: StateFlow<GpsReading>,
@@ -79,7 +95,7 @@ class SpeedLimitProvider(
             enabledFlow.collectLatest { (enabled, speedUnit) ->
                 if (!enabled) {
                     _reading.value = SpeedLimitReading(status = "Off")
-                    resetCache()
+                    resetSession()
                     return@collectLatest
                 }
 
@@ -89,14 +105,29 @@ class SpeedLimitProvider(
                     val lng = g.longitude
                     if (!g.hasFix || lat == null || lng == null) {
                         if (_reading.value.limit == null) {
-                            _reading.value = SpeedLimitReading(unit = speedUnit, status = "NO GPS")
+                            val cached = diskCache.nearest(lat = null, lng = null, unit = speedUnit)
+                            _reading.value = cached?.toReading(status = "CACHE")
+                                ?: SpeedLimitReading(unit = speedUnit, status = "NO GPS")
                         }
                         delay(2_000L)
                         continue
                     }
+
+                    // Instant UI from disk while we refresh.
+                    val nearbyCache = diskCache.nearest(lat, lng, speedUnit)
+                    if (nearbyCache != null && _reading.value.limit == null) {
+                        _reading.value = nearbyCache.toReading(status = null)
+                        lastPlaceId = nearbyCache.placeId
+                    }
+
                     val moved = lastLat == null ||
                         haversineM(lastLat!!, lastLng!!, lat, lng) >= MIN_MOVE_M
-                    if (moved || _reading.value.limit == null || _reading.value.unit != speedUnit) {
+                    val needsFresh = moved ||
+                        _reading.value.limit == null ||
+                        _reading.value.unit != speedUnit ||
+                        _reading.value.status == "ERR" ||
+                        _reading.value.status == "CACHE"
+                    if (needsFresh) {
                         fetchLimit(lat, lng, speedUnit)
                     }
                     delay(POLL_INTERVAL_MS)
@@ -110,7 +141,7 @@ class SpeedLimitProvider(
         job = null
     }
 
-    private fun resetCache() {
+    private fun resetSession() {
         lastLat = null
         lastLng = null
         lastPlaceId = null
@@ -126,61 +157,72 @@ class SpeedLimitProvider(
                 lastLng = lng
                 lastPlaceId = reading.placeId
                 _reading.value = reading
+                if (reading.limit != null || reading.status == "N/A" || reading.status == "NO RD") {
+                    diskCache.put(lat, lng, reading)
+                }
             },
             onFailure = { t ->
                 Log.w(TAG, "Speed limit lookup failed", t)
-                _reading.value = SpeedLimitReading(
-                    limit = _reading.value.limit,
-                    unit = unit,
-                    placeId = lastPlaceId,
-                    status = "ERR"
-                )
+                val cached = diskCache.nearest(lat, lng, unit)
+                    ?: diskCache.nearest(null, null, unit)
+                if (cached != null) {
+                    Log.i(
+                        TAG,
+                        "Using cached limit=${cached.limit} ${cached.unit} " +
+                            "from ${"%.5f".format(Locale.US, cached.lat)}," +
+                            "${"%.5f".format(Locale.US, cached.lng)}"
+                    )
+                    lastLat = lat
+                    lastLng = lng
+                    lastPlaceId = cached.placeId
+                    _reading.value = cached.toReading(status = "CACHE")
+                } else {
+                    _reading.value = SpeedLimitReading(
+                        limit = _reading.value.limit,
+                        unit = unit,
+                        placeId = lastPlaceId,
+                        status = "ERR"
+                    )
+                }
             }
         )
     }
 
     private fun queryOverpass(lat: Double, lng: Double, unit: SpeedUnit): SpeedLimitReading {
-        var sawHighway = false
-        for (radius in SEARCH_RADII_M) {
-            val elements = overpassWays(lat, lng, radius)
-            if (elements.length() == 0) continue
-
-            val ranked = rankWays(elements, lat, lng)
-            if (ranked.isNotEmpty()) sawHighway = true
-
-            val withLimit = ranked.firstOrNull { it.limitKph != null }
-            if (withLimit != null) {
-                val placeId = withLimit.wayId
-                if (placeId == lastPlaceId &&
-                    _reading.value.limit != null &&
-                    _reading.value.unit == unit
-                ) {
-                    return _reading.value.copy(status = null)
-                }
-                val limit = convertLimit(withLimit.limitKph!!, unit)
-                Log.i(
-                    TAG,
-                    "OSM way/${withLimit.wayId} maxspeed=${withLimit.rawMaxspeed} " +
-                        "→ $limit ${unit.name} @ ${"%.5f".format(Locale.US, lat)}," +
-                        "${"%.5f".format(Locale.US, lng)} r=${radius}m"
-                )
-                return SpeedLimitReading(
-                    limit = limit,
-                    unit = unit,
-                    placeId = placeId,
-                    status = null
-                )
+        val elements = overpassWays(lat, lng, SEARCH_RADIUS_M)
+        val ranked = rankWays(elements, lat, lng)
+        val withLimit = ranked.firstOrNull { it.limitKph != null }
+        if (withLimit != null) {
+            val placeId = withLimit.wayId
+            if (placeId == lastPlaceId &&
+                _reading.value.limit != null &&
+                _reading.value.unit == unit
+            ) {
+                return _reading.value.copy(status = null)
             }
+            val limit = convertLimit(withLimit.limitKph!!, unit)
+            Log.i(
+                TAG,
+                "OSM ${withLimit.wayId} maxspeed=${withLimit.rawMaxspeed} " +
+                    "→ $limit ${unit.name} dist=${withLimit.distanceM.toInt()}m " +
+                    "@ ${"%.5f".format(Locale.US, lat)},${"%.5f".format(Locale.US, lng)}"
+            )
+            return SpeedLimitReading(
+                limit = limit,
+                unit = unit,
+                placeId = placeId,
+                status = null
+            )
         }
         return SpeedLimitReading(
             unit = unit,
-            status = if (sawHighway) "N/A" else "NO RD"
+            status = if (ranked.isNotEmpty()) "N/A" else "NO RD"
         )
     }
 
     private fun overpassWays(lat: Double, lng: Double, radiusM: Int): JSONArray {
         val query = buildString {
-            append("[out:json][timeout:10];")
+            append("[out:json][timeout:15];")
             append("way[\"highway\"](around:")
             append(radiusM)
             append(',')
@@ -190,14 +232,23 @@ class SpeedLimitProvider(
             append(");")
             append("out tags center;")
         }
+        val endpoints = endpointsInOrder()
         var lastError: Exception? = null
-        for (endpoint in OVERPASS_ENDPOINTS) {
+        for ((index, endpoint) in endpoints.withIndex()) {
+            val primary = index == 0
             try {
-                val json = httpPostForm(endpoint, "data" to query)
+                val json = httpPostForm(
+                    endpoint,
+                    connectMs = if (primary) CONNECT_TIMEOUT_MS else FALLBACK_CONNECT_MS,
+                    readMs = if (primary) READ_TIMEOUT_MS else FALLBACK_READ_MS,
+                    "data" to query
+                )
                 val remark = json.optString("remark")
                 if (remark.contains("error", ignoreCase = true)) {
                     error(remark.take(80))
                 }
+                preferredEndpoint = endpoint
+                Log.i(TAG, "Overpass OK via $endpoint")
                 return json.optJSONArray("elements") ?: JSONArray()
             } catch (e: Exception) {
                 lastError = e
@@ -205,6 +256,15 @@ class SpeedLimitProvider(
             }
         }
         throw lastError ?: IllegalStateException("Overpass unavailable")
+    }
+
+    private fun endpointsInOrder(): List<String> {
+        val preferred = preferredEndpoint
+        return if (preferred != null && preferred in OVERPASS_ENDPOINTS) {
+            listOf(preferred) + OVERPASS_ENDPOINTS.filter { it != preferred }
+        } else {
+            OVERPASS_ENDPOINTS
+        }
     }
 
     private data class RankedWay(
@@ -251,15 +311,20 @@ class SpeedLimitProvider(
         return null
     }
 
-    private fun httpPostForm(url: String, vararg form: Pair<String, String>): JSONObject {
+    private fun httpPostForm(
+        url: String,
+        connectMs: Int,
+        readMs: Int,
+        vararg form: Pair<String, String>
+    ): JSONObject {
         val body = form.joinToString("&") { (k, v) ->
             "${URLEncoder.encode(k, Charsets.UTF_8.name())}=" +
                 URLEncoder.encode(v, Charsets.UTF_8.name())
         }.toByteArray(Charsets.UTF_8)
 
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 10_000
-            readTimeout = 12_000
+            connectTimeout = connectMs
+            readTimeout = readMs
             requestMethod = "POST"
             doOutput = true
             setRequestProperty("Accept", "application/json")
@@ -301,6 +366,124 @@ class SpeedLimitProvider(
             sin(dLon / 2) * sin(dLon / 2)
         return 2 * r * atan2(sqrt(a), sqrt(1 - a))
     }
+
+    private fun SpeedLimitDiskCache.Entry.toReading(status: String?): SpeedLimitReading =
+        SpeedLimitReading(
+            limit = limit,
+            unit = unit,
+            placeId = placeId,
+            status = status ?: this.status
+        )
+
+    /**
+     * Persists recent successful lookups so outages still show a limit.
+     * Entries expire after [CACHE_TTL_MS]; nearest within [CACHE_HIT_M] wins.
+     */
+    private class SpeedLimitDiskCache(context: Context) {
+        private val prefs = context.getSharedPreferences("speed_limit_cache", Context.MODE_PRIVATE)
+
+        data class Entry(
+            val lat: Double,
+            val lng: Double,
+            val limit: Int?,
+            val unit: SpeedUnit,
+            val placeId: String?,
+            val status: String?,
+            val savedAtMs: Long
+        )
+
+        fun put(lat: Double, lng: Double, reading: SpeedLimitReading) {
+            val key = cellKey(lat, lng, reading.unit)
+            val json = JSONObject()
+                .put("lat", lat)
+                .put("lng", lng)
+                .put("limit", reading.limit ?: JSONObject.NULL)
+                .put("unit", reading.unit.name)
+                .put("placeId", reading.placeId)
+                .put("status", reading.status)
+                .put("savedAtMs", System.currentTimeMillis())
+            prefs.edit().putString(key, json.toString()).apply()
+            prune(reading.unit)
+        }
+
+        fun nearest(lat: Double?, lng: Double?, unit: SpeedUnit): Entry? {
+            val now = System.currentTimeMillis()
+            var best: Entry? = null
+            var bestDist = Double.MAX_VALUE
+            for ((_, raw) in prefs.all) {
+                val text = raw as? String ?: continue
+                val e = parse(text) ?: continue
+                if (e.unit != unit) continue
+                if (now - e.savedAtMs > CACHE_TTL_MS) continue
+                if (lat == null || lng == null) {
+                    if (best == null || e.savedAtMs > best.savedAtMs) best = e
+                    continue
+                }
+                val d = haversineStatic(lat, lng, e.lat, e.lng)
+                if (d <= CACHE_HIT_M && d < bestDist) {
+                    best = e
+                    bestDist = d
+                }
+            }
+            return best
+        }
+
+        private fun prune(unit: SpeedUnit) {
+            val now = System.currentTimeMillis()
+            val editor = prefs.edit()
+            var changed = false
+            val keep = ArrayList<Pair<String, Entry>>()
+            for ((key, raw) in prefs.all) {
+                val text = raw as? String ?: continue
+                val e = parse(text)
+                if (e == null || now - e.savedAtMs > CACHE_TTL_MS) {
+                    editor.remove(key)
+                    changed = true
+                } else if (e.unit == unit) {
+                    keep += key to e
+                }
+            }
+            if (keep.size > 40) {
+                keep.sortedByDescending { it.second.savedAtMs }
+                    .drop(40)
+                    .forEach {
+                        editor.remove(it.first)
+                        changed = true
+                    }
+            }
+            if (changed) editor.apply()
+        }
+
+        private fun parse(text: String): Entry? = runCatching {
+            val o = JSONObject(text)
+            Entry(
+                lat = o.getDouble("lat"),
+                lng = o.getDouble("lng"),
+                limit = if (o.isNull("limit")) null else o.getInt("limit"),
+                unit = SpeedUnit.valueOf(o.getString("unit")),
+                placeId = o.optString("placeId").takeIf { it.isNotBlank() },
+                status = o.optString("status").takeIf { it.isNotBlank() },
+                savedAtMs = o.getLong("savedAtMs")
+            )
+        }.getOrNull()
+
+        private fun cellKey(lat: Double, lng: Double, unit: SpeedUnit): String {
+            // ~110 m cells
+            val la = String.format(Locale.US, "%.3f", lat)
+            val lo = String.format(Locale.US, "%.3f", lng)
+            return "c:$la:$lo:${unit.name}"
+        }
+    }
+}
+
+private fun haversineStatic(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371000.0
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
+        sin(dLon / 2) * sin(dLon / 2)
+    return 2 * r * atan2(sqrt(a), sqrt(1 - a))
 }
 
 private val IGNORED_HIGHWAYS = setOf(
@@ -334,7 +517,6 @@ internal fun parseMaxspeedToKph(raw: String): Double? {
         // Zone codes like DE:urban / CA:urban need regional tables — skip for now.
         return null
     }
-    // "25 mph", "50 km/h", "30", "70"
     val mph = Regex("""^(\d+(?:\.\d+)?)\s*mph$""").matchEntire(s)
     if (mph != null) {
         return mph.groupValues[1].toDouble() * 1.609344

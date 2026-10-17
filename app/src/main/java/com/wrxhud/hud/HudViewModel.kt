@@ -41,7 +41,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     private val settingsRepository = SettingsRepository(application)
     private val gps = GpsSpeedProvider(application)
     private val motion = MotionSensorProvider(application)
-    private val speedLimitProvider = SpeedLimitProvider(viewModelScope)
+    private val speedLimitProvider = SpeedLimitProvider(viewModelScope, application)
 
     private val _serviceSnapshot = MutableStateFlow(VehicleSnapshot())
     private val _status = MutableStateFlow("Idle")
