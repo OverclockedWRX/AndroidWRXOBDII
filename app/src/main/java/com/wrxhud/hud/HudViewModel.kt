@@ -157,6 +157,8 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             )
             _runtimeStarted.value = true
         }
+        // Keep OBD/sim off during the required mount-calibration screen.
+        if (!preferences.motionCalibrated) return
         if (lastSimulatorSetting != preferences.useSimulator) {
             lastSimulatorSetting = preferences.useSimulator
             startObd(useSimulator = preferences.useSimulator)

@@ -90,7 +90,7 @@ class ObdService : Service() {
             }
             ACTION_START, null -> {
                 val useSim = intent?.getBooleanExtra(EXTRA_USE_SIMULATOR, false) == true
-                startForegroundNotification()
+                startForegroundNotification(useSimulator = useSim)
                 if (useSim) {
                     startSimulator()
                 } else {
@@ -108,7 +108,7 @@ class ObdService : Service() {
         super.onDestroy()
     }
 
-    private fun startForegroundNotification() {
+    private fun startForegroundNotification(useSimulator: Boolean) {
         val pending = PendingIntent.getActivity(
             this,
             0,
@@ -122,12 +122,23 @@ class ObdService : Service() {
             .setContentIntent(pending)
             .setOngoing(true)
             .build()
-        ServiceCompat.startForeground(
-            this,
-            NOTIFICATION_ID,
-            notification,
+        // Simulator has no BT/USB device — connectedDevice can SecurityException on API 34+.
+        val type = if (useSimulator) {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        } else {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-        )
+        }
+        try {
+            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
+        } catch (t: Throwable) {
+            Log.e(TAG, "startForeground($type) failed; retrying specialUse", t)
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            )
+        }
     }
 
     private fun startSimulator() {

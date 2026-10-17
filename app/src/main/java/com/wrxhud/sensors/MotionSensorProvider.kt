@@ -5,9 +5,10 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.Build
+import android.hardware.display.DisplayManager
+import android.util.Log
+import android.view.Display
 import android.view.Surface
-import android.view.WindowManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,9 +32,15 @@ data class MotionReading(
  * plus dynamic G from [Sensor.TYPE_LINEAR_ACCELERATION] (gravity stripped).
  */
 class MotionSensorProvider(context: Context) : SensorEventListener {
+    companion object {
+        private const val TAG = "MotionSensors"
+    }
+
     private val appContext = context.applicationContext
     private val sensorManager =
         appContext.getSystemService(Context.SENSOR_SERVICE) as SensorManager
+    private val displayManager =
+        appContext.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
 
     private val rotationSensor: Sensor? =
         sensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
@@ -77,38 +84,42 @@ class MotionSensorProvider(context: Context) : SensorEventListener {
     }
 
     override fun onSensorChanged(event: SensorEvent) {
-        when (event.sensor.type) {
-            Sensor.TYPE_LINEAR_ACCELERATION -> {
-                val ax = event.values[0]
-                val ay = event.values[1]
-                val az = event.values[2]
-                latestG = sqrt(ax * ax + ay * ay + az * az) / SensorManager.GRAVITY_EARTH
-            }
-            Sensor.TYPE_ACCELEROMETER -> {
-                // Fallback only when linear acceleration is unavailable: strip ~1g baseline.
-                if (linearAccel == null) {
+        try {
+            when (event.sensor.type) {
+                Sensor.TYPE_LINEAR_ACCELERATION -> {
                     val ax = event.values[0]
                     val ay = event.values[1]
                     val az = event.values[2]
-                    val totalG = sqrt(ax * ax + ay * ay + az * az) / SensorManager.GRAVITY_EARTH
-                    latestG = (totalG - 1f).coerceAtLeast(0f)
+                    latestG = sqrt(ax * ax + ay * ay + az * az) / SensorManager.GRAVITY_EARTH
+                }
+                Sensor.TYPE_ACCELEROMETER -> {
+                    // Fallback only when linear acceleration is unavailable: strip ~1g baseline.
+                    if (linearAccel == null) {
+                        val ax = event.values[0]
+                        val ay = event.values[1]
+                        val az = event.values[2]
+                        val totalG = sqrt(ax * ax + ay * ay + az * az) / SensorManager.GRAVITY_EARTH
+                        latestG = (totalG - 1f).coerceAtLeast(0f)
+                    }
+                }
+                Sensor.TYPE_ROTATION_VECTOR, Sensor.TYPE_GAME_ROTATION_VECTOR -> {
+                    SensorManager.getRotationMatrixFromVector(deviceRotationMatrix, event.values)
+                    val world = if (remapToScreenAxes(deviceRotationMatrix, remappedRotationMatrix)) {
+                        remappedRotationMatrix
+                    } else {
+                        deviceRotationMatrix
+                    }
+                    SensorManager.getOrientation(world, orientation)
+                    // azimuth, pitch, roll — relative to the current screen orientation
+                    latestYaw = Math.toDegrees(orientation[0].toDouble()).toFloat()
+                    latestPitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
+                    latestRoll = Math.toDegrees(orientation[2].toDouble()).toFloat()
                 }
             }
-            Sensor.TYPE_ROTATION_VECTOR, Sensor.TYPE_GAME_ROTATION_VECTOR -> {
-                SensorManager.getRotationMatrixFromVector(deviceRotationMatrix, event.values)
-                val world = if (remapToScreenAxes(deviceRotationMatrix, remappedRotationMatrix)) {
-                    remappedRotationMatrix
-                } else {
-                    deviceRotationMatrix
-                }
-                SensorManager.getOrientation(world, orientation)
-                // azimuth, pitch, roll — relative to the current screen orientation
-                latestYaw = Math.toDegrees(orientation[0].toDouble()).toFloat()
-                latestPitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
-                latestRoll = Math.toDegrees(orientation[2].toDouble()).toFloat()
-            }
+            publish()
+        } catch (t: Throwable) {
+            Log.w(TAG, "Sensor update failed", t)
         }
-        publish()
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
@@ -130,16 +141,15 @@ class MotionSensorProvider(context: Context) : SensorEventListener {
         return SensorManager.remapCoordinateSystem(inR, xAxis, yAxis, outR)
     }
 
-    @Suppress("DEPRECATION")
+    /**
+     * Never use [Context.getDisplay] on an Application context — on API 30+ it can throw
+     * UnsupportedOperationException ("Context not associated with a display"), which crashed
+     * the mount-calibration screen as soon as rotation sensors fired.
+     */
     private fun currentDisplayRotation(): Int {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            appContext.display?.rotation
-                ?: (appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
-                    .defaultDisplay.rotation
-        } else {
-            (appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager)
-                .defaultDisplay.rotation
-        }
+        return runCatching {
+            displayManager.getDisplay(Display.DEFAULT_DISPLAY)?.rotation
+        }.getOrNull() ?: Surface.ROTATION_0
     }
 
     private fun publish() {
