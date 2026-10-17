@@ -76,7 +76,7 @@ data class HudPreferences(
     val motionCalibPitchDeg: Float = 0f,
     val motionCalibRollDeg: Float = 0f,
     val motionCalibYawDeg: Float = 0f,
-    val motionCalibGForce: Float = 1f,
+    val motionCalibGForce: Float = 0f,
     /** Built-in / Bluetooth / USB / Auto GPS source selection. */
     val gpsSourceMode: GpsSourceMode = GpsSourceMode.AUTO,
     /** Optional bonded BT GPS MAC; empty = auto-pick by device name. */

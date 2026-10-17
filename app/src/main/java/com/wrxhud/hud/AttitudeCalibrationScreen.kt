@@ -145,6 +145,7 @@ fun AttitudeCalibrationScreen(
             Checklist("Car parked on level ground, not moving")
             Checklist("Don’t touch the phone during the ~3s sample")
             Checklist("Engine idle is OK — avoid hard idle shake if possible")
+            Checklist("After remounting or rotating landscape, recalibrate")
         }
 
         Column(

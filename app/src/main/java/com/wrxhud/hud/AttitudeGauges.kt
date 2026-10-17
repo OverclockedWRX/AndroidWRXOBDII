@@ -43,7 +43,6 @@ import kotlin.math.sin
 private val RingGreen = Color(0xFFB8F000)
 private val RingCyan = Color(0xFF00E5FF)
 private val CarGlow = Color(0xFFE8FF4A)
-private val LabelCyan = Color(0xFF7DD3FC)
 private val HorizonLine = Color(0xFF94A3B8)
 
 /**
@@ -117,23 +116,23 @@ private fun DualAttitudeRings(
             .border(1.dp, HudColors.Border, shape)
             .padding(horizontal = 6.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Bottom
     ) {
         InclinometerGauge(
-            label = "PITCHING",
+            label = "Pitch",
             degrees = motion.pitchDeg,
             kind = InclinometerKind.PITCH,
             size = 88.dp
         )
         InclinometerGauge(
-            label = "ROLLING",
+            label = "Roll",
             degrees = motion.rollDeg,
             kind = InclinometerKind.ROLL,
             size = 88.dp
         )
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(start = 2.dp)
+            modifier = Modifier.padding(start = 2.dp, bottom = 4.dp)
         ) {
             Text("G", color = HudColors.TextDim, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
             Text(
@@ -160,18 +159,21 @@ private fun CombinedAttitudeRing(
             .border(1.dp, HudColors.Border, shape)
             .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.Bottom
     ) {
         InclinometerGauge(
-            label = "ATTITUDE",
+            label = "Attitude",
             degrees = motion.pitchDeg,
             secondaryDegrees = motion.rollDeg,
             kind = InclinometerKind.COMBINED,
             size = 96.dp
         )
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            TinyMetric("PIT", formatSignedDegrees(motion.pitchDeg))
-            TinyMetric("ROL", formatSignedDegrees(motion.rollDeg))
+        Column(
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+            modifier = Modifier.padding(bottom = 4.dp)
+        ) {
+            TinyMetric("Pitch", formatSignedDegrees(motion.pitchDeg))
+            TinyMetric("Roll", formatSignedDegrees(motion.rollDeg))
             TinyMetric("G", formatGForce(motion.gForce))
         }
     }
@@ -213,36 +215,35 @@ private fun InclinometerGauge(
         else -> if (degrees == null) "—" else "${signed(degrees.roundToInt())}°"
     }
 
-    Box(modifier = Modifier.size(size)) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawInclinometerFace(
-                kind = kind,
-                pitchDeg = deg,
-                rollDeg = if (kind == InclinometerKind.COMBINED) roll else deg
-            )
-        }
-        Text(
-            text = valueLabel,
-            color = CarGlow,
-            fontSize = if (kind == InclinometerKind.COMBINED) 11.sp else 15.sp,
-            fontWeight = FontWeight.Bold,
-            fontFamily = FontFamily.Monospace,
-            maxLines = 1,
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = size * 0.14f)
-        )
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        // Match other HUD widgets: short label above the gauge.
         Text(
             text = label,
-            color = LabelCyan,
-            fontSize = 9.sp,
-            fontWeight = FontWeight.SemiBold,
-            fontFamily = FontFamily.Monospace,
-            letterSpacing = 1.sp,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = size * 0.12f)
+            color = HudColors.TextDim,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium,
+            fontFamily = FontFamily.Monospace
         )
+        Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                drawInclinometerFace(
+                    kind = kind,
+                    pitchDeg = deg,
+                    rollDeg = if (kind == InclinometerKind.COMBINED) roll else deg
+                )
+            }
+            Text(
+                text = valueLabel,
+                color = CarGlow,
+                fontSize = if (kind == InclinometerKind.COMBINED) 12.sp else 16.sp,
+                fontWeight = FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = size * 0.16f)
+            )
+        }
     }
 }
 
@@ -272,18 +273,20 @@ private fun DrawScope.drawInclinometerFace(
     )
 
     // Bias car slightly below center so the degree readout above stays clear.
-    translate(cx, cy + r * 0.08f) {
+    translate(cx, cy + r * 0.10f) {
         when (kind) {
             InclinometerKind.PITCH -> {
+                // Screen-remapped pitch: positive = nose up → clockwise for side-view nose-right.
                 val tilt = pitchDeg.coerceIn(-45f, 45f)
-                rotate(degrees = -tilt) {
-                    drawWrxVbSide(scale = r * 0.032f)
+                rotate(degrees = tilt) {
+                    drawWrxVbSide(scale = r * 0.034f)
                 }
             }
             InclinometerKind.ROLL -> {
+                // Screen-remapped roll: positive = lean right → clockwise for rear view.
                 val tilt = rollDeg.coerceIn(-45f, 45f)
                 rotate(degrees = tilt) {
-                    drawWrxVbRear(scale = r * 0.032f)
+                    drawWrxVbRear(scale = r * 0.034f)
                 }
             }
             InclinometerKind.COMBINED -> {

@@ -29,7 +29,7 @@ class MotionCalibrationTest {
         val pitches = List(40) { if (it % 2 == 0) 0f else 10f }
         val rolls = List(40) { 0f }
         val yaws = List(40) { 0f }
-        val gs = List(40) { 1f }
+        val gs = List(40) { 0.02f }
         val stats = computeCalibrationStats(pitches, rolls, yaws, gs)
         val result = evaluateMountCalibration(stats)
         assertThat(result).isInstanceOf(CalibrationResult.Rejected::class.java)
@@ -40,12 +40,22 @@ class MotionCalibrationTest {
         val pitches = List(40) { 11.2f + (it % 3) * 0.05f }
         val rolls = List(40) { -4.1f + (it % 2) * 0.04f }
         val yaws = List(40) { 90.0f }
-        val gs = List(40) { 0.99f + (it % 2) * 0.01f }
+        val gs = List(40) { 0.02f + (it % 2) * 0.01f }
         val stats = computeCalibrationStats(pitches, rolls, yaws, gs)!!
         val result = evaluateMountCalibration(stats)
         assertThat(result).isInstanceOf(CalibrationResult.Ok::class.java)
         val ok = result as CalibrationResult.Ok
         assertThat(ok.calibration.pitchDeg).isWithin(0.5f).of(11.2f)
+    }
+
+    @Test
+    fun evaluate_rejectsHighDynamicG() {
+        val pitches = List(40) { 0f }
+        val rolls = List(40) { 0f }
+        val yaws = List(40) { 0f }
+        val gs = List(40) { 0.4f }
+        val result = evaluateMountCalibration(computeCalibrationStats(pitches, rolls, yaws, gs))
+        assertThat(result).isInstanceOf(CalibrationResult.Rejected::class.java)
     }
 
     @Test

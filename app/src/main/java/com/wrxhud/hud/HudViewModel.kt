@@ -191,7 +191,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
                 motionCalibPitchDeg = 0f,
                 motionCalibRollDeg = 0f,
                 motionCalibYawDeg = 0f,
-                motionCalibGForce = 1f
+                motionCalibGForce = 0f
             )
         }
     }

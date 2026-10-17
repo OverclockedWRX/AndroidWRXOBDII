@@ -10,7 +10,7 @@ data class MotionMountCalibration(
     val pitchDeg: Float = 0f,
     val rollDeg: Float = 0f,
     val yawDeg: Float = 0f,
-    val gForce: Float = 1f
+    val gForce: Float = 0f
 )
 
 fun wrapSignedDegrees(deg: Float): Float {
@@ -27,7 +27,7 @@ fun MotionReading.relativeTo(calib: MotionMountCalibration, calibrated: Boolean)
         pitchDeg = pitchDeg?.let { wrapSignedDegrees(it - calib.pitchDeg) },
         rollDeg = rollDeg?.let { wrapSignedDegrees(it - calib.rollDeg) },
         yawDeg = yawDeg?.let { wrapSignedDegrees(it - calib.yawDeg) }
-        // g-force stays absolute (gravity + acceleration)
+        // Dynamic G is already gravity-stripped; do not offset it.
     )
 }
 
@@ -62,7 +62,7 @@ fun computeCalibrationStats(
     val pMean = mean(pitches)
     val rMean = mean(rolls)
     val yMean = wrapSignedDegrees(mean(yawUnwrapped))
-    val gMean = if (gs.isNotEmpty()) mean(gs) else 1f
+    val gMean = if (gs.isNotEmpty()) mean(gs) else 0f
     return CalibrationSampleStats(
         pitchMean = pMean,
         rollMean = rMean,
@@ -89,7 +89,7 @@ sealed class CalibrationResult {
 }
 
 /**
- * Accept a parked mount sample set if attitude is stable and g ≈ 1.
+ * Accept a parked mount sample set if attitude is stable and dynamic G ≈ 0 (car still).
  */
 fun evaluateMountCalibration(stats: CalibrationSampleStats?): CalibrationResult {
     if (stats == null || stats.sampleCount < 15) {
@@ -102,14 +102,15 @@ fun evaluateMountCalibration(stats: CalibrationSampleStats?): CalibrationResult 
     if (stats.pitchStd > maxAngleStd || stats.rollStd > maxAngleStd || stats.yawStd > 4f) {
         return CalibrationResult.Rejected(
             CalibrationRejectReason.TOO_SHAKY,
-            "Too much movement (P±%.1f° R±%.1f° Y±%.1f°). Park, don’t touch the phone."
-                .format(stats.pitchStd, stats.rollStd, stats.yawStd)
+            "Too much movement (P±%.1f° R±%.1f°). Park, don’t touch the phone."
+                .format(stats.pitchStd, stats.rollStd)
         )
     }
-    if (stats.gMean !in 0.85f..1.15f || stats.gStd > 0.08f) {
+    // Dynamic G should be near zero when parked (gravity already stripped).
+    if (stats.gMean > 0.12f || stats.gStd > 0.08f) {
         return CalibrationResult.Rejected(
             CalibrationRejectReason.G_FORCE_OUT_OF_RANGE,
-            "G-force unstable (%.2fg). Park on level ground with the car still."
+            "Car still moving (%.2fg dynamic). Park and hold still."
                 .format(stats.gMean)
         )
     }
