@@ -7,18 +7,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.unit.dp
 import com.wrxhud.settings.ShiftLightPattern
+import com.wrxhud.settings.TachVisualStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -42,7 +42,7 @@ fun ShiftLights(
     thresholds: List<Int>,
     redline: Int,
     pattern: ShiftLightPattern = ShiftLightPattern.LEFT_TO_RIGHT,
-    threeDimensional: Boolean = false,
+    visualStyle: TachVisualStyle = TachVisualStyle.BAR_3D,
     modifier: Modifier = Modifier
 ) {
     val flashOn by produceState(initialValue = true, rpm, redline) {
@@ -67,10 +67,22 @@ fun ShiftLights(
     val border = HudColors.Border
     val panel = HudColors.Panel
 
+    var phase by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(visualStyle) {
+        if (visualStyle == TachVisualStyle.LIQUID) {
+            while (true) {
+                withFrameNanos { ns ->
+                    phase = ((ns % 3_500_000_000L).toFloat() / 3_500_000_000f)
+                }
+            }
+        }
+    }
+
+    val tall = visualStyle != TachVisualStyle.HELIX
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(if (threeDimensional) 32.dp else 28.dp)
+            .height(if (tall) 34.dp else 28.dp)
             .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -79,128 +91,25 @@ fun ShiftLights(
             Canvas(
                 modifier = Modifier
                     .weight(1f)
-                    .height(if (threeDimensional) 26.dp else 22.dp)
+                    .height(if (tall) 28.dp else 22.dp)
             ) {
-                if (threeDimensional) {
-                    drawLamp3d(
+                when (visualStyle) {
+                    TachVisualStyle.LIQUID -> drawLampLiquid(
+                        lit = lamp.lit,
+                        faceColor = face,
+                        lampOff = lampOff,
+                        phase = phase + lamp.stageIndex * 0.15f
+                    )
+                    TachVisualStyle.BAR_3D, TachVisualStyle.HELIX -> drawLamp3dEnhanced(
                         lit = lamp.lit,
                         faceColor = face,
                         lampOff = lampOff,
                         border = border,
                         panel = panel
                     )
-                } else {
-                    drawRoundRect(
-                        color = face,
-                        topLeft = Offset.Zero,
-                        size = size,
-                        cornerRadius = CornerRadius(4.dp.toPx(), 4.dp.toPx())
-                    )
                 }
             }
         }
-    }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawLamp3d(
-    lit: Boolean,
-    faceColor: Color,
-    lampOff: Color,
-    border: Color,
-    panel: Color
-) {
-    val depth = size.height * 0.28f
-    val frontH = size.height - depth
-    val frontW = size.width - depth * 0.55f
-    val frontTop = depth * 0.12f
-    val radius = CornerRadius(3.dp.toPx(), 3.dp.toPx())
-
-    // Floor / bottom extrusion
-    val floor = Path().apply {
-        moveTo(0f, frontTop + frontH)
-        lineTo(frontW, frontTop + frontH)
-        lineTo(frontW + depth * 0.55f, frontTop + frontH + depth)
-        lineTo(depth * 0.55f, frontTop + frontH + depth)
-        close()
-    }
-    drawPath(floor, color = Color.Black.copy(alpha = if (lit) 0.5f else 0.65f))
-
-    // Top extrusion
-    val roof = Path().apply {
-        moveTo(0f, frontTop)
-        lineTo(frontW, frontTop)
-        lineTo(frontW + depth * 0.55f, frontTop + depth)
-        lineTo(depth * 0.55f, frontTop + depth)
-        close()
-    }
-    drawPath(
-        roof,
-        brush = Brush.verticalGradient(
-            colors = if (lit) {
-                listOf(faceColor.copy(alpha = 0.95f), faceColor.copy(alpha = 0.55f))
-            } else {
-                listOf(border, lampOff)
-            },
-            startY = frontTop,
-            endY = frontTop + depth
-        )
-    )
-
-    // Right end cap
-    val endCap = Path().apply {
-        moveTo(frontW, frontTop)
-        lineTo(frontW + depth * 0.55f, frontTop + depth)
-        lineTo(frontW + depth * 0.55f, frontTop + frontH + depth)
-        lineTo(frontW, frontTop + frontH)
-        close()
-    }
-    drawPath(
-        endCap,
-        color = if (lit) faceColor.copy(alpha = 0.55f) else panel
-    )
-
-    // Front face
-    drawRoundRect(
-        color = faceColor,
-        topLeft = Offset(0f, frontTop),
-        size = Size(frontW, frontH),
-        cornerRadius = radius
-    )
-
-    if (lit) {
-        // Specular highlight strip
-        drawRoundRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.White.copy(alpha = 0.55f), Color.Transparent),
-                startY = frontTop,
-                endY = frontTop + frontH * 0.45f
-            ),
-            topLeft = Offset(0f, frontTop),
-            size = Size(frontW, frontH * 0.45f),
-            cornerRadius = radius
-        )
-        // Soft glow along bottom edge of face
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.Transparent, faceColor.copy(alpha = 0.35f)),
-                startY = frontTop + frontH * 0.55f,
-                endY = frontTop + frontH
-            ),
-            topLeft = Offset(0f, frontTop + frontH * 0.55f),
-            size = Size(frontW, frontH * 0.45f)
-        )
-    } else {
-        // Inset shadow for unlit LED well
-        drawRoundRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.Black.copy(alpha = 0.35f), Color.Transparent),
-                startY = frontTop,
-                endY = frontTop + frontH * 0.4f
-            ),
-            topLeft = Offset(0f, frontTop),
-            size = Size(frontW, frontH * 0.4f),
-            cornerRadius = radius
-        )
     }
 }
 

@@ -284,33 +284,73 @@ private fun LookTab(
     onRecalibrateMotion: () -> Unit
 ) {
     SectionTitle("Appearance")
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                "Pinky Mode",
-                color = if (preferences.pinkyMode) HudColors.Accent else HudColors.TextPrimary,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "Soft rose / hot-pink HUD theme",
-                color = HudColors.TextDim,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace
+    Text(
+        "Color theme",
+        color = HudColors.TextDim,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        HudColorTheme.entries.take(2).forEach { theme ->
+            FilterChip(
+                selected = preferences.colorTheme == theme,
+                onClick = {
+                    HudThemeController.colorTheme = theme
+                    onUpdate { it.copy(colorTheme = theme, pinkyMode = theme == HudColorTheme.PINKY) }
+                },
+                label = { Text(theme.label, fontFamily = FontFamily.Monospace) }
             )
         }
-        Switch(
-            checked = preferences.pinkyMode,
-            onCheckedChange = { checked ->
-                HudThemeController.pinkyMode = checked
-                onUpdate { it.copy(pinkyMode = checked) }
-            }
-        )
     }
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        HudColorTheme.entries.drop(2).forEach { theme ->
+            FilterChip(
+                selected = preferences.colorTheme == theme,
+                onClick = {
+                    HudThemeController.colorTheme = theme
+                    onUpdate { it.copy(colorTheme = theme, pinkyMode = theme == HudColorTheme.PINKY) }
+                },
+                label = { Text(theme.label, fontFamily = FontFamily.Monospace) }
+            )
+        }
+    }
+    Text(
+        "Night dims chromas for dark cockpit; E-ink day is high-contrast cream/black (full refresh rate).",
+        color = HudColors.TextDim,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace,
+        lineHeight = 15.sp
+    )
+
+    Text(
+        "Tach / shift style",
+        color = HudColors.TextDim,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        TachVisualStyle.entries.forEach { style ->
+            FilterChip(
+                selected = preferences.tachVisualStyle == style,
+                onClick = {
+                    onUpdate {
+                        it.copy(
+                            tachVisualStyle = style,
+                            rpmGauge3d = style == TachVisualStyle.BAR_3D
+                        )
+                    }
+                },
+                label = { Text(style.label, fontFamily = FontFamily.Monospace) }
+            )
+        }
+    }
+    Text(
+        "Liquid = water-like fill (same zone colors). Helix = RPM + boost double helix (hides separate Boost tile).",
+        color = HudColors.TextDim,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace,
+        lineHeight = 15.sp
+    )
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -335,31 +375,6 @@ private fun LookTab(
         Switch(
             checked = preferences.dangerToManifold,
             onCheckedChange = { checked -> onUpdate { it.copy(dangerToManifold = checked) } }
-        )
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-            Text(
-                "3D gauges",
-                color = if (preferences.rpmGauge3d) HudColors.Accent else HudColors.TextPrimary,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                "Extruded RPM tach and shift lights with depth, bevel, and specular edge",
-                color = HudColors.TextDim,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace
-            )
-        }
-        Switch(
-            checked = preferences.rpmGauge3d,
-            onCheckedChange = { checked -> onUpdate { it.copy(rpmGauge3d = checked) } }
         )
     }
 

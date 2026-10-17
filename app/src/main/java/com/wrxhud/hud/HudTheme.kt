@@ -4,13 +4,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import com.wrxhud.settings.HudColorTheme
 
 /**
  * Active HUD palette. Reading any [HudColors] property during composition
- * subscribes to [pinkyMode] so the UI recomposes when the theme flips.
+ * subscribes to [colorTheme] so the UI recomposes when the theme flips.
  */
 object HudThemeController {
-    var pinkyMode by mutableStateOf(false)
+    var colorTheme by mutableStateOf(HudColorTheme.CLASSIC)
+
+    /** @deprecated Prefer [colorTheme]; kept for call sites during migration. */
+    var pinkyMode: Boolean
+        get() = colorTheme == HudColorTheme.PINKY
+        set(value) {
+            colorTheme = if (value) HudColorTheme.PINKY else HudColorTheme.CLASSIC
+        }
 }
 
 private data class HudColorScheme(
@@ -45,7 +53,6 @@ private val ClassicScheme = HudColorScheme(
     lampOff = Color(0xFF2A2A2A)
 )
 
-/** Soft rose / blush / hot-pink family that stays readable on a dark HUD. */
 private val PinkyScheme = HudColorScheme(
     background = Color(0xFF14080F),
     panel = Color(0xFF261018),
@@ -62,9 +69,51 @@ private val PinkyScheme = HudColorScheme(
     lampOff = Color(0xFF3D2433)
 )
 
+/** Deeper blacks, muted chromas — easier on night eyes. */
+private val NightScheme = HudColorScheme(
+    background = Color(0xFF000000),
+    panel = Color(0xFF0A0A0A),
+    border = Color(0xFF1A1A1A),
+    textPrimary = Color(0xFFC8C8C8),
+    textDim = Color(0xFF5A5A5A),
+    accent = Color(0xFFB91C1C),
+    boostBlue = Color(0xFF1D4ED8),
+    green = Color(0xFF15803D),
+    amber = Color(0xFFB45309),
+    red = Color(0xFF991B1B),
+    tachTrack = Color(0xFF101010),
+    tachFill = Color(0xFF9CA3AF),
+    lampOff = Color(0xFF181818)
+)
+
+/**
+ * High-contrast daylight “e-ink” look — cream paper + black ink.
+ * Refreshes at the same rate as other themes (no slow e-ink simulation).
+ */
+private val EinkScheme = HudColorScheme(
+    background = Color(0xFFF2EFE6),
+    panel = Color(0xFFE8E4D9),
+    border = Color(0xFF2A2A2A),
+    textPrimary = Color(0xFF111111),
+    textDim = Color(0xFF4A4A4A),
+    accent = Color(0xFF111111),
+    boostBlue = Color(0xFF1A1A1A),
+    green = Color(0xFF333333),
+    amber = Color(0xFF222222),
+    red = Color(0xFF000000),
+    tachTrack = Color(0xFFD4D0C4),
+    tachFill = Color(0xFF111111),
+    lampOff = Color(0xFFC8C4B8)
+)
+
 object HudColors {
     private val scheme: HudColorScheme
-        get() = if (HudThemeController.pinkyMode) PinkyScheme else ClassicScheme
+        get() = when (HudThemeController.colorTheme) {
+            HudColorTheme.CLASSIC -> ClassicScheme
+            HudColorTheme.PINKY -> PinkyScheme
+            HudColorTheme.NIGHT -> NightScheme
+            HudColorTheme.EINK -> EinkScheme
+        }
 
     val Background: Color get() = scheme.background
     val Panel: Color get() = scheme.panel

@@ -64,11 +64,16 @@ data class HudPreferences(
     val tireAspect: Int = WrxProfile.DEFAULT_TIRE_ASPECT,
     val wheelDiameterIn: Int = WrxProfile.DEFAULT_WHEEL_DIAMETER_IN,
     val useSimulator: Boolean = false,
+    /** @deprecated Migrated into [colorTheme]; kept for DataStore upgrade path. */
     val pinkyMode: Boolean = false,
+    /** Global HUD color palette (classic / pinky / night / e-ink). */
+    val colorTheme: HudColorTheme = HudColorTheme.CLASSIC,
     /** Fast & Furious redline Easter egg overlay after the 2nd+ redline hit this session. */
     val dangerToManifold: Boolean = false,
-    /** Extruded / beveled 3D look for the RPM bar tach. */
-    val rpmGauge3d: Boolean = false,
+    /** @deprecated Migrated into [tachVisualStyle]. */
+    val rpmGauge3d: Boolean = true,
+    /** How RPM bar + shift lights are drawn (3D / liquid / helix). */
+    val tachVisualStyle: TachVisualStyle = TachVisualStyle.BAR_3D,
     /** How pitch / roll / G are shown next to the tach. */
     val motionDisplayMode: MotionDisplayMode = MotionDisplayMode.RINGS,
     /** Which motion gauges appear (text strip / rings / combined side metrics). */

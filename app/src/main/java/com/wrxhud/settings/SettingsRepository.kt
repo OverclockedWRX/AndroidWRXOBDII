@@ -39,8 +39,10 @@ class SettingsRepository(private val context: Context) {
         val wheelIn = intPreferencesKey("wheel_in")
         val useSim = booleanPreferencesKey("use_sim")
         val pinkyMode = booleanPreferencesKey("pinky_mode")
+        val colorTheme = stringPreferencesKey("color_theme")
         val dangerToManifold = booleanPreferencesKey("danger_to_manifold")
         val rpmGauge3d = booleanPreferencesKey("rpm_gauge_3d")
+        val tachVisualStyle = stringPreferencesKey("tach_visual_style")
         val motionDisplayMode = stringPreferencesKey("motion_display_mode")
         val showMotionPitch = booleanPreferencesKey("show_motion_pitch")
         val showMotionRoll = booleanPreferencesKey("show_motion_roll")
@@ -88,9 +90,11 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.tireAspect] = next.tireAspect
             prefs[Keys.wheelIn] = next.wheelDiameterIn
             prefs[Keys.useSim] = next.useSimulator
-            prefs[Keys.pinkyMode] = next.pinkyMode
+            prefs[Keys.pinkyMode] = next.colorTheme == HudColorTheme.PINKY
+            prefs[Keys.colorTheme] = next.colorTheme.name
             prefs[Keys.dangerToManifold] = next.dangerToManifold
-            prefs[Keys.rpmGauge3d] = next.rpmGauge3d
+            prefs[Keys.rpmGauge3d] = next.tachVisualStyle == TachVisualStyle.BAR_3D
+            prefs[Keys.tachVisualStyle] = next.tachVisualStyle.name
             prefs[Keys.motionDisplayMode] = next.motionDisplayMode.name
             prefs[Keys.showMotionPitch] = next.showMotionPitch
             prefs[Keys.showMotionRoll] = next.showMotionRoll
@@ -154,8 +158,16 @@ class SettingsRepository(private val context: Context) {
             wheelDiameterIn = this[Keys.wheelIn] ?: defaults.wheelDiameterIn,
             useSimulator = this[Keys.useSim] ?: defaults.useSimulator,
             pinkyMode = this[Keys.pinkyMode] ?: defaults.pinkyMode,
+            colorTheme = HudColorTheme.fromStored(
+                this[Keys.colorTheme],
+                pinkyFallback = this[Keys.pinkyMode] ?: false
+            ),
             dangerToManifold = this[Keys.dangerToManifold] ?: defaults.dangerToManifold,
             rpmGauge3d = this[Keys.rpmGauge3d] ?: defaults.rpmGauge3d,
+            tachVisualStyle = TachVisualStyle.fromStored(
+                this[Keys.tachVisualStyle],
+                rpm3dFallback = this[Keys.rpmGauge3d] ?: true
+            ),
             motionDisplayMode = MotionDisplayMode.fromStored(this[Keys.motionDisplayMode])
                 ?: defaults.motionDisplayMode,
             showMotionPitch = this[Keys.showMotionPitch] ?: defaults.showMotionPitch,

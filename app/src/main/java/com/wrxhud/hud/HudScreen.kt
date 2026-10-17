@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.sp
 import com.wrxhud.gps.SpeedLimitReading
 import com.wrxhud.sensors.MotionReading
 import com.wrxhud.settings.HudPreferences
+import com.wrxhud.settings.TachVisualStyle
 import com.wrxhud.vehicle.AlarmEvaluator
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.SpeedUnit
@@ -64,7 +65,7 @@ fun HudScreen(
                     thresholds = preferences.shiftLightStarts,
                     redline = preferences.redlineRpm,
                     pattern = preferences.shiftLightPattern,
-                    threeDimensional = preferences.rpmGauge3d,
+                    visualStyle = preferences.tachVisualStyle,
                     modifier = Modifier.weight(1f)
                 )
                 IconButton(onClick = onOpenSettings) {
@@ -92,11 +93,15 @@ fun HudScreen(
                         roll = preferences.showMotionRoll,
                         gForce = preferences.showMotionGForce
                     ),
-                    threeDimensional = preferences.rpmGauge3d
+                    visualStyle = preferences.tachVisualStyle,
+                    boostPsi = snapshot.boostPsi,
+                    maxBoostPsi = preferences.boostRedPsi
                 )
             }
 
             Spacer(Modifier.height(8.dp))
+
+            val helixOwnsBoost = preferences.tachVisualStyle == TachVisualStyle.HELIX
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -160,7 +165,7 @@ fun HudScreen(
                             modifier = Modifier.weight(1f)
                         )
                     }
-                    if (GaugeId.BOOST in preferences.enabledGauges) {
+                    if (GaugeId.BOOST in preferences.enabledGauges && !helixOwnsBoost) {
                         BoostVacTile(
                             psi = snapshot.boostPsi,
                             unit = preferences.pressureUnit,

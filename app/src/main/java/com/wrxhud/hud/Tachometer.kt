@@ -21,25 +21,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.sensors.MotionReading
 import com.wrxhud.settings.MotionDisplayMode
+import com.wrxhud.settings.TachVisualStyle
 import com.wrxhud.vehicle.UnitConverters
 import kotlin.math.min
 
 /**
  * Full-width bar tach with frame-timed interpolation and zone coloring
  * (blue → green → amber → red toward redline), AiM-style.
- * Optional faux-3D extruded bar when [threeDimensional] is enabled.
+ * Visual style: enhanced 3D bar, liquid water, or RPM+boost double helix.
  */
 @Composable
 fun Tachometer(
@@ -51,7 +46,9 @@ fun Tachometer(
     motion: MotionReading = MotionReading(),
     motionDisplayMode: MotionDisplayMode = MotionDisplayMode.RINGS,
     motionVisibility: MotionGaugeVisibility = MotionGaugeVisibility(),
-    threeDimensional: Boolean = false,
+    visualStyle: TachVisualStyle = TachVisualStyle.BAR_3D,
+    boostPsi: Float? = null,
+    maxBoostPsi: Float = 22f,
     modifier: Modifier = Modifier
 ) {
     val maxRpm = (redline + 500).coerceAtLeast(7000).toFloat()
@@ -92,11 +89,29 @@ fun Tachometer(
     val accent = HudColors.Accent
     val panel = HudColors.Panel
     val border = HudColors.Border
+    val boostBlue = HudColors.BoostBlue
+
+    var phase by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(visualStyle) {
+        if (visualStyle == TachVisualStyle.LIQUID || visualStyle == TachVisualStyle.HELIX) {
+            while (true) {
+                withFrameNanos { ns ->
+                    phase = ((ns % 4_000_000_000L).toFloat() / 4_000_000_000f)
+                }
+            }
+        }
+    }
+
+    val tachHeight = when {
+        motionDisplayMode == MotionDisplayMode.TEXT -> 130.dp
+        motionVisibility.anyVisible -> 168.dp
+        else -> 148.dp
+    }
 
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(if (motionDisplayMode == MotionDisplayMode.TEXT) 130.dp else 148.dp)
+            .height(tachHeight)
             .padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -143,109 +158,82 @@ fun Tachometer(
                     .weight(1f)
             ) {
                 Canvas(modifier = Modifier.fillMaxSize()) {
-                    val depth = if (threeDimensional) size.height * 0.22f else 0f
-                    val trackHeight = if (threeDimensional) {
-                        size.height * 0.55f
-                    } else {
-                        size.height * 0.7f
-                    }
-                    val top = (size.height - trackHeight - depth) / 2f
-                    val trackWidth = size.width - depth
-                    val blueX = trackWidth * (blueEnd / maxRpm)
-                    val greenX = trackWidth * (greenEnd / maxRpm)
-                    val amberX = trackWidth * (amberStart / maxRpm)
-                    val redX = trackWidth * (redStart / maxRpm)
-                    val redlineX = trackWidth * (redline / maxRpm)
-                    val corner = CornerRadius(8f, 8f)
                     val fraction = min(displayRpm / maxRpm, 1f)
-                    val fillWidth = trackWidth * fraction
-                    val tachStops = arrayOf(
-                        0f to blue,
-                        (blueEnd / maxRpm) to blue,
-                        (greenEnd / maxRpm) to green,
-                        (amberStart / maxRpm) to green,
-                        (redStart / maxRpm) to amber,
-                        (redline / maxRpm) to red,
-                        1f to red
-                    )
-
-                    if (threeDimensional) {
-                        drawTach3d(
-                            top = top,
-                            trackHeight = trackHeight,
-                            trackWidth = trackWidth,
-                            depth = depth,
-                            fillWidth = fillWidth,
-                            blueX = blueX,
-                            greenX = greenX,
-                            amberX = amberX,
-                            redX = redX,
-                            redlineX = redlineX,
-                            tachStops = tachStops,
+                    when (visualStyle) {
+                        TachVisualStyle.LIQUID -> drawTachLiquid(
+                            displayRpm = displayRpm,
+                            maxRpm = maxRpm,
+                            blueEnd = blueEnd,
+                            greenEnd = greenEnd,
+                            amberStart = amberStart,
+                            redStart = redStart,
+                            redline = redline.toFloat(),
+                            phase = phase,
                             trackColor = trackColor,
                             blue = blue,
                             green = green,
                             amber = amber,
                             red = red,
-                            accent = accent,
-                            panel = panel,
-                            border = border
+                            accent = accent
                         )
-                    } else {
-                        drawRoundRect(
-                            color = trackColor,
-                            topLeft = Offset(0f, top),
-                            size = Size(trackWidth, trackHeight),
-                            cornerRadius = corner
-                        )
-                        drawRect(
-                            color = blue.copy(alpha = 0.18f),
-                            topLeft = Offset(0f, top),
-                            size = Size(blueX, trackHeight)
-                        )
-                        drawRect(
-                            color = green.copy(alpha = 0.18f),
-                            topLeft = Offset(blueX, top),
-                            size = Size(greenX - blueX, trackHeight)
-                        )
-                        drawRect(
-                            color = amber.copy(alpha = 0.18f),
-                            topLeft = Offset(amberX, top),
-                            size = Size(redX - amberX, trackHeight)
-                        )
-                        drawRect(
-                            color = red.copy(alpha = 0.22f),
-                            topLeft = Offset(redX, top),
-                            size = Size(trackWidth - redX, trackHeight)
-                        )
-
-                        if (fillWidth > 0f) {
-                            drawRoundRect(
-                                brush = Brush.horizontalGradient(
-                                    colorStops = tachStops,
-                                    startX = 0f,
-                                    endX = trackWidth
-                                ),
-                                topLeft = Offset(0f, top),
-                                size = Size(fillWidth, trackHeight),
-                                cornerRadius = corner
+                        TachVisualStyle.HELIX -> {
+                            val boostFrac = ((boostPsi ?: 0f).coerceAtLeast(0f) / maxBoostPsi.coerceAtLeast(1f))
+                                .coerceIn(0f, 1f)
+                            drawTachHelix(
+                                rpmFraction = fraction,
+                                boostFraction = boostFrac,
+                                phase = phase * (2f * Math.PI.toFloat()),
+                                trackColor = trackColor,
+                                blue = blue,
+                                green = green,
+                                amber = amber,
+                                red = red,
+                                accent = accent,
+                                boostBlue = boostBlue
                             )
                         }
-
-                        listOf(blueX, greenX, amberX, redX).forEach { x ->
-                            drawLine(
-                                color = Color.Black.copy(alpha = 0.45f),
-                                start = Offset(x, top),
-                                end = Offset(x, top + trackHeight),
-                                strokeWidth = 2f
+                        TachVisualStyle.BAR_3D -> {
+                            val depth = size.height * 0.28f
+                            val trackHeight = size.height * 0.52f
+                            val top = (size.height - trackHeight - depth) / 2f
+                            val trackWidth = size.width - depth
+                            val blueX = trackWidth * (blueEnd / maxRpm)
+                            val greenX = trackWidth * (greenEnd / maxRpm)
+                            val amberX = trackWidth * (amberStart / maxRpm)
+                            val redX = trackWidth * (redStart / maxRpm)
+                            val redlineX = trackWidth * (redline / maxRpm)
+                            val fillWidth = trackWidth * fraction
+                            val tachStops = arrayOf(
+                                0f to blue,
+                                (blueEnd / maxRpm) to blue,
+                                (greenEnd / maxRpm) to green,
+                                (amberStart / maxRpm) to green,
+                                (redStart / maxRpm) to amber,
+                                (redline / maxRpm) to red,
+                                1f to red
+                            )
+                            drawTach3dEnhanced(
+                                top = top,
+                                trackHeight = trackHeight,
+                                trackWidth = trackWidth,
+                                depth = depth,
+                                fillWidth = fillWidth,
+                                blueX = blueX,
+                                greenX = greenX,
+                                amberX = amberX,
+                                redX = redX,
+                                redlineX = redlineX,
+                                tachStops = tachStops,
+                                trackColor = trackColor,
+                                blue = blue,
+                                green = green,
+                                amber = amber,
+                                red = red,
+                                accent = accent,
+                                panel = panel,
+                                border = border
                             )
                         }
-                        drawLine(
-                            color = accent,
-                            start = Offset(redlineX, top - 4f),
-                            end = Offset(redlineX, top + trackHeight + 4f),
-                            strokeWidth = 3f
-                        )
                     }
                 }
             }
@@ -258,173 +246,4 @@ fun Tachometer(
                 .fillMaxHeight()
         )
     }
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawTach3d(
-    top: Float,
-    trackHeight: Float,
-    trackWidth: Float,
-    depth: Float,
-    fillWidth: Float,
-    blueX: Float,
-    greenX: Float,
-    amberX: Float,
-    redX: Float,
-    redlineX: Float,
-    tachStops: Array<Pair<Float, Color>>,
-    trackColor: Color,
-    blue: Color,
-    green: Color,
-    amber: Color,
-    red: Color,
-    accent: Color,
-    panel: Color,
-    border: Color
-) {
-    val frontTop = top + depth * 0.15f
-    val frontBottom = frontTop + trackHeight
-
-    val floor = Path().apply {
-        moveTo(0f, frontBottom)
-        lineTo(trackWidth, frontBottom)
-        lineTo(trackWidth + depth, frontBottom + depth)
-        lineTo(depth, frontBottom + depth)
-        close()
-    }
-    drawPath(floor, color = Color.Black.copy(alpha = 0.55f))
-
-    val roof = Path().apply {
-        moveTo(0f, frontTop)
-        lineTo(trackWidth, frontTop)
-        lineTo(trackWidth + depth, frontTop + depth)
-        lineTo(depth, frontTop + depth)
-        close()
-    }
-    drawPath(
-        roof,
-        brush = Brush.verticalGradient(
-            colors = listOf(border.copy(alpha = 0.9f), trackColor),
-            startY = frontTop,
-            endY = frontTop + depth
-        )
-    )
-
-    val endCap = Path().apply {
-        moveTo(trackWidth, frontTop)
-        lineTo(trackWidth + depth, frontTop + depth)
-        lineTo(trackWidth + depth, frontBottom + depth)
-        lineTo(trackWidth, frontBottom)
-        close()
-    }
-    drawPath(endCap, color = panel)
-
-    drawRoundRect(
-        color = trackColor,
-        topLeft = Offset(0f, frontTop),
-        size = Size(trackWidth, trackHeight),
-        cornerRadius = CornerRadius(6f, 6f)
-    )
-    drawRect(
-        color = blue.copy(alpha = 0.16f),
-        topLeft = Offset(0f, frontTop),
-        size = Size(blueX, trackHeight)
-    )
-    drawRect(
-        color = green.copy(alpha = 0.16f),
-        topLeft = Offset(blueX, frontTop),
-        size = Size(greenX - blueX, trackHeight)
-    )
-    drawRect(
-        color = amber.copy(alpha = 0.16f),
-        topLeft = Offset(amberX, frontTop),
-        size = Size(redX - amberX, trackHeight)
-    )
-    drawRect(
-        color = red.copy(alpha = 0.2f),
-        topLeft = Offset(redX, frontTop),
-        size = Size(trackWidth - redX, trackHeight)
-    )
-
-    if (fillWidth > 0f) {
-        val fillRoof = Path().apply {
-            moveTo(0f, frontTop)
-            lineTo(fillWidth, frontTop)
-            lineTo(fillWidth + depth, frontTop + depth)
-            lineTo(depth, frontTop + depth)
-            close()
-        }
-        drawPath(
-            fillRoof,
-            brush = Brush.horizontalGradient(
-                colorStops = tachStops.map { (t, c) -> t to c.copy(alpha = 0.85f) }.toTypedArray(),
-                startX = 0f,
-                endX = trackWidth
-            )
-        )
-
-        val tip = Path().apply {
-            moveTo(fillWidth, frontTop)
-            lineTo(fillWidth + depth, frontTop + depth)
-            lineTo(fillWidth + depth, frontBottom + depth)
-            lineTo(fillWidth, frontBottom)
-            close()
-        }
-        val tipColor = when {
-            fillWidth >= redX -> red
-            fillWidth >= amberX -> amber
-            fillWidth >= greenX -> green
-            else -> blue
-        }
-        drawPath(
-            tip,
-            brush = Brush.horizontalGradient(
-                colors = listOf(tipColor, tipColor.copy(alpha = 0.55f)),
-                startX = fillWidth,
-                endX = fillWidth + depth
-            )
-        )
-
-        drawRoundRect(
-            brush = Brush.horizontalGradient(
-                colorStops = tachStops,
-                startX = 0f,
-                endX = trackWidth
-            ),
-            topLeft = Offset(0f, frontTop),
-            size = Size(fillWidth, trackHeight),
-            cornerRadius = CornerRadius(6f, 6f)
-        )
-
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.White.copy(alpha = 0.45f), Color.Transparent),
-                startY = frontTop,
-                endY = frontTop + trackHeight * 0.35f
-            ),
-            topLeft = Offset(0f, frontTop),
-            size = Size(fillWidth, trackHeight * 0.35f)
-        )
-    }
-
-    listOf(blueX, greenX, amberX, redX).forEach { x ->
-        drawLine(
-            color = Color.Black.copy(alpha = 0.4f),
-            start = Offset(x, frontTop),
-            end = Offset(x, frontBottom),
-            strokeWidth = 2f
-        )
-    }
-
-    drawLine(
-        color = accent,
-        start = Offset(redlineX, frontTop - 3f),
-        end = Offset(redlineX, frontBottom + 3f),
-        strokeWidth = 3f
-    )
-    drawLine(
-        color = accent.copy(alpha = 0.45f),
-        start = Offset(redlineX, frontTop - 3f),
-        end = Offset(redlineX + depth * 0.35f, frontTop - 3f + depth * 0.35f),
-        strokeWidth = 2f
-    )
 }

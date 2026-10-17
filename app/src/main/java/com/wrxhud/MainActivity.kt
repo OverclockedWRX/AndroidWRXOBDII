@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
             }
 
             SideEffect {
-                HudThemeController.pinkyMode = ui.preferences.pinkyMode
+                HudThemeController.colorTheme = ui.preferences.colorTheme
             }
 
             Surface(

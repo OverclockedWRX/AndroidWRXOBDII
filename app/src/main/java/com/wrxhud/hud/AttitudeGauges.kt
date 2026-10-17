@@ -147,24 +147,22 @@ private fun DualAttitudeRings(
     ) {
         if (visibility.pitch) {
             InclinometerGauge(
-                label = "Pitch",
                 degrees = motion.pitchDeg,
                 kind = InclinometerKind.PITCH,
-                size = 88.dp
+                size = 112.dp
             )
         }
         if (visibility.roll) {
             InclinometerGauge(
-                label = "Roll",
                 degrees = motion.rollDeg,
                 kind = InclinometerKind.ROLL,
-                size = 88.dp
+                size = 112.dp
             )
         }
         if (visibility.gForce) {
             GForceGauge(
                 motion = motion,
-                size = 88.dp
+                size = 112.dp
             )
         }
     }
@@ -189,32 +187,29 @@ private fun CombinedAttitudeRing(
         when {
             visibility.pitch && visibility.roll -> {
                 InclinometerGauge(
-                    label = "Attitude",
                     degrees = motion.pitchDeg,
                     secondaryDegrees = motion.rollDeg,
                     kind = InclinometerKind.COMBINED,
-                    size = 96.dp
+                    size = 120.dp
                 )
             }
             visibility.pitch -> {
                 InclinometerGauge(
-                    label = "Pitch",
                     degrees = motion.pitchDeg,
                     kind = InclinometerKind.PITCH,
-                    size = 88.dp
+                    size = 112.dp
                 )
             }
             visibility.roll -> {
                 InclinometerGauge(
-                    label = "Roll",
                     degrees = motion.rollDeg,
                     kind = InclinometerKind.ROLL,
-                    size = 88.dp
+                    size = 112.dp
                 )
             }
         }
         if (visibility.gForce) {
-            GForceGauge(motion = motion, size = 88.dp)
+            GForceGauge(motion = motion, size = 112.dp)
         }
         if (visibility.pitch || visibility.roll) {
             Column(
@@ -251,35 +246,26 @@ private fun GForceGauge(
     }
     val trailSnapshot = trail.toList()
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = "G",
-            color = HudColors.TextDim,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.Monospace
-        )
-        Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawGForceFace(
-                    lateralG = lat ?: 0f,
-                    longitudinalG = lon ?: 0f,
-                    hasSample = lat != null && lon != null,
-                    trail = trailSnapshot
-                )
-            }
-            Text(
-                text = formatGForce(motion.gForce),
-                color = CarGlow,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = size * 0.16f)
+    Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawGForceFace(
+                lateralG = lat ?: 0f,
+                longitudinalG = lon ?: 0f,
+                hasSample = lat != null && lon != null,
+                trail = trailSnapshot
             )
         }
+        Text(
+            text = formatGForce(motion.gForce),
+            color = CarGlow,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = size * 0.18f)
+        )
     }
 }
 
@@ -374,7 +360,6 @@ private enum class InclinometerKind { PITCH, ROLL, COMBINED }
 
 @Composable
 private fun InclinometerGauge(
-    label: String,
     degrees: Float?,
     kind: InclinometerKind,
     size: Dp,
@@ -392,35 +377,25 @@ private fun InclinometerGauge(
         else -> if (degrees == null) "—" else "${signed(degrees.roundToInt())}°"
     }
 
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        // Match other HUD widgets: short label above the gauge.
-        Text(
-            text = label,
-            color = HudColors.TextDim,
-            fontSize = 10.sp,
-            fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.Monospace
-        )
-        Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                drawInclinometerFace(
-                    kind = kind,
-                    pitchDeg = deg,
-                    rollDeg = if (kind == InclinometerKind.COMBINED) roll else deg
-                )
-            }
-            Text(
-                text = valueLabel,
-                color = CarGlow,
-                fontSize = if (kind == InclinometerKind.COMBINED) 12.sp else 16.sp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = size * 0.16f)
+    Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawInclinometerFace(
+                kind = kind,
+                pitchDeg = deg,
+                rollDeg = if (kind == InclinometerKind.COMBINED) roll else deg
             )
         }
+        Text(
+            text = valueLabel,
+            color = CarGlow,
+            fontSize = if (kind == InclinometerKind.COMBINED) 9.sp else 11.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace,
+            maxLines = 1,
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = size * 0.18f)
+        )
     }
 }
 
@@ -459,14 +434,14 @@ private fun DrawScope.drawInclinometerFace(
                 // Screen-remapped pitch: positive = nose up → clockwise for side-view nose-right.
                 val tilt = pitchDeg.coerceIn(-45f, 45f)
                 rotate(degrees = tilt, pivot = Offset.Zero) {
-                    drawWrxVbSide(scale = r * 0.052f)
+                    drawWrxVbSide(scale = r * 0.058f)
                 }
             }
             InclinometerKind.ROLL -> {
                 // Screen-remapped roll: positive = lean right → clockwise for rear view.
                 val tilt = rollDeg.coerceIn(-45f, 45f)
                 rotate(degrees = tilt, pivot = Offset.Zero) {
-                    drawWrxVbRear(scale = r * 0.052f)
+                    drawWrxVbRear(scale = r * 0.058f)
                 }
             }
             InclinometerKind.COMBINED -> {
