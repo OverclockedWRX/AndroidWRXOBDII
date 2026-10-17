@@ -98,8 +98,9 @@ fun PidScanSection(
         modifier = Modifier.padding(top = 8.dp)
     )
     Text(
-        text = "Scan Mode 01 support + known Mode 22 probes. Assign a PID/DID to oil temp, " +
-            "oil pressure, AFR, etc. Requires a live OBDLink MX+ (not simulator).",
+        text = "Read-only scan: Mode 01 support bits + a wide Mode 22 (UDS 0x22) DID hunt for " +
+            "IAT / MAP / knock / DAM / oil pressure. Nothing is written to OBD-II or CAN. " +
+            "Assign hits to gauges below. Requires a live OBDLink MX+ (not simulator).",
         color = HudColors.TextDim,
         fontSize = 12.sp,
         fontFamily = FontFamily.Monospace

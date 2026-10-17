@@ -12,6 +12,7 @@ import com.wrxhud.gps.GpsSpeedProvider
 import com.wrxhud.gps.SpeedLimitProvider
 import com.wrxhud.gps.SpeedLimitReading
 import com.wrxhud.logging.CsvDataLogger
+import com.wrxhud.obd.DtcReadResult
 import com.wrxhud.obd.ObdService
 import com.wrxhud.obd.PidScanRow
 import com.wrxhud.sensors.MotionMountCalibration
@@ -264,6 +265,15 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     /** Run a live PID scan on the connected MX+. Empty if simulator / not connected. */
     suspend fun scanPids(): List<PidScanRow> {
         return service?.scanPids().orEmpty()
+    }
+
+    suspend fun readDtcs(): DtcReadResult {
+        return service?.readDtcs()
+            ?: DtcReadResult(message = "Not connected — turn off simulator and link MX+")
+    }
+
+    suspend fun clearDtcs(): Boolean {
+        return service?.clearDtcs() == true
     }
 
     fun isLiveObdConnected(): Boolean = service?.isLiveConnected() == true

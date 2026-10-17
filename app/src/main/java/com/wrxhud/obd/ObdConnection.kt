@@ -78,6 +78,8 @@ class ObdConnection(
     @Synchronized
     fun sendCommand(command: String, waitForPrompt: Boolean = true): String {
         check(open.get()) { "OBD connection is closed" }
+        // Never emit write / clear / session / IO / memory traffic onto OBD-II / CAN.
+        ObdReadOnlyGuard.assertAllowed(command)
         val w = writer ?: error("No writer")
         val r = reader ?: error("No reader")
 

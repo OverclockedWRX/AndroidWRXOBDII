@@ -79,12 +79,19 @@
                 android:value="In-car OBD telemetry and offline race HUD simulator" />
         </service>
 
+        <!--
+          Car App Library HUD. Category is POI (not IOT): many Android Auto head units
+          hide IOT-category services from the projected launcher. Play quality guidelines
+          for POI will not apply to private Internal Testing / Internal App Sharing builds.
+          Real-car testing requires install from a trusted source (Play Internal Testing /
+          Internal App Sharing) — adb sideload alone will not list Car App Library apps.
+        -->
         <service
             android:name=".auto.WrxCarAppService"
             android:exported="true">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
-                <category android:name="androidx.car.app.category.IOT" />
+                <category android:name="androidx.car.app.category.POI" />
             </intent-filter>
         </service>
     </application>

@@ -87,6 +87,8 @@ class MainActivity : ComponentActivity() {
                             ui = ui,
                             onUpdatePreferences = viewModel::updatePreferences,
                             onScanPids = { viewModel.scanPids() },
+                            onReadDtcs = { viewModel.readDtcs() },
+                            onClearDtcs = { viewModel.clearDtcs() },
                             connectionStatus = ui.connectionStatus,
                             onRecalibrateMotion = viewModel::clearMountCalibration,
                             onToggleLogging = viewModel::toggleDataLog

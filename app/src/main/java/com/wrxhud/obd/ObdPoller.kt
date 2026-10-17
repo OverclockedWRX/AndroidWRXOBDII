@@ -58,6 +58,10 @@ class ObdPoller(
     private var oilTempMode22Did: Int? = null
     private var useMode01OilTemp: Boolean = false
     private var oilTempSourceLabel: String = "none"
+    private var iatMode22Did: Int? = null
+    private var useMode01Iat: Boolean = false
+    private var mapMode22Did: Int? = null
+    private var useMode01Map: Boolean = false
 
     private data class SlowPid(
         val name: String,
@@ -143,6 +147,18 @@ class ObdPoller(
             oilTempMode22Did = null
             oilTempSourceLabel = "user"
         }
+        if (assignment(MappableSignal.IAT) == null) {
+            discoverIat()
+        } else {
+            useMode01Iat = false
+            iatMode22Did = null
+        }
+        if (assignment(MappableSignal.BOOST_MAP) == null) {
+            discoverMap()
+        } else {
+            useMode01Map = false
+            mapMode22Did = null
+        }
     }
 
     private fun assignment(signal: MappableSignal): PidAssignment? =
@@ -192,6 +208,74 @@ class ObdPoller(
         }
     }
 
+    /** SAE 01 0F when supported; else first plausible Mode 22 IAT candidate (read-only). */
+    private fun discoverIat() {
+        useMode01Iat = false
+        iatMode22Did = null
+        val tryMode01 = supportedPids.contains(WrxProfile.Pid.IAT) || supportedPids.isEmpty()
+        if (tryMode01) {
+            val raw = connection.sendCommand(ObdCommands.mode01(WrxProfile.Pid.IAT))
+            val data = StnParser.parseMode01(raw, WrxProfile.Pid.IAT)
+            val temp = data?.let { StnParser.decodeTempC(it) }
+            if (temp != null && temp in -30f..90f) {
+                useMode01Iat = true
+                _snapshot.update { it.copy(intakeAirTempC = temp) }
+                Log.i(TAG, "IAT confirmed via Mode 01 PID 0F = $temp C")
+                return
+            }
+        }
+        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
+        for (candidate in WrxProfile.iatCandidates) {
+            val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
+            val data = StnParser.parseMode22(raw, candidate.did) ?: continue
+            val value = candidate.scale(data) ?: continue
+            if (!candidate.plausible(value)) continue
+            iatMode22Did = candidate.did
+            _snapshot.update { it.copy(intakeAirTempC = value) }
+            Log.i(TAG, "IAT confirmed via 22 ${"%04X".format(candidate.did)} = $value C")
+            break
+        }
+        connection.sendCommand("ATSH7DF")
+        if (iatMode22Did == null && !useMode01Iat) {
+            Log.w(TAG, "IAT: no Mode 01/22 source confirmed yet — check PID Log after a deep scan")
+        }
+    }
+
+    /** SAE 01 0B when supported; else first plausible Mode 22 MAP candidate (read-only). */
+    private fun discoverMap() {
+        useMode01Map = false
+        mapMode22Did = null
+        val tryMode01 = supportedPids.contains(WrxProfile.Pid.MAP) || supportedPids.isEmpty()
+        if (tryMode01) {
+            val raw = connection.sendCommand(ObdCommands.mode01(WrxProfile.Pid.MAP))
+            val data = StnParser.parseMode01(raw, WrxProfile.Pid.MAP)
+            val kpa = data?.let { StnParser.decodePressureKpa(it) }
+            if (kpa != null && kpa in 15f..320f) {
+                useMode01Map = true
+                mapKpa = kpa
+                updateBoost()
+                Log.i(TAG, "MAP confirmed via Mode 01 PID 0B = $kpa kPa")
+                return
+            }
+        }
+        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
+        for (candidate in WrxProfile.mapCandidates) {
+            val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
+            val data = StnParser.parseMode22(raw, candidate.did) ?: continue
+            val value = candidate.scale(data) ?: continue
+            if (!candidate.plausible(value)) continue
+            mapMode22Did = candidate.did
+            mapKpa = value
+            updateBoost()
+            Log.i(TAG, "MAP confirmed via 22 ${"%04X".format(candidate.did)} = $value kPa")
+            break
+        }
+        connection.sendCommand("ATSH7DF")
+        if (mapMode22Did == null && !useMode01Map) {
+            Log.w(TAG, "MAP/boost: no Mode 01/22 source confirmed yet — check PID Log after a deep scan")
+        }
+    }
+
     private fun buildSlowQueue(): List<SlowPid> {
         val list = mutableListOf<SlowPid>()
         val assignments = assignmentsProvider()
@@ -217,10 +301,22 @@ class ObdPoller(
             addAssigned(MappableSignal.IAT, "iat") { v ->
                 _snapshot.update { it.copy(intakeAirTempC = v) }
             }
-        } else {
+        } else if (useMode01Iat) {
             list += SlowPid("iat") {
                 pollMode01(WrxProfile.Pid.IAT) { data ->
                     _snapshot.update { it.copy(intakeAirTempC = StnParser.decodeTempC(data)) }
+                }
+            }
+        } else {
+            iatMode22Did?.let { did ->
+                list += SlowPid("iat") {
+                    pollMode22(did) { data ->
+                        val candidate = WrxProfile.iatCandidates.first { it.did == did }
+                        val value = candidate.scale(data)
+                        if (value != null && candidate.plausible(value)) {
+                            _snapshot.update { it.copy(intakeAirTempC = value) }
+                        }
+                    }
                 }
             }
         }
@@ -230,11 +326,24 @@ class ObdPoller(
                 mapKpa = v
                 updateBoost()
             }
-        } else {
+        } else if (useMode01Map) {
             list += SlowPid("map") {
                 pollMode01(WrxProfile.Pid.MAP) { data ->
                     mapKpa = StnParser.decodePressureKpa(data)
                     updateBoost()
+                }
+            }
+        } else {
+            mapMode22Did?.let { did ->
+                list += SlowPid("map") {
+                    pollMode22(did) { data ->
+                        val candidate = WrxProfile.mapCandidates.first { it.did == did }
+                        val value = candidate.scale(data)
+                        if (value != null && candidate.plausible(value)) {
+                            mapKpa = value
+                            updateBoost()
+                        }
+                    }
                 }
             }
         }

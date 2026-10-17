@@ -56,6 +56,7 @@ private enum class SettingsTab(val label: String) {
     LOOK("Look"),
     PIDS("PIDs"),
     PID_LOG("PID Log"),
+    CODES("Codes"),
     GAUGES("Gauges"),
     LAMPS("Lamps"),
     UNITS("Units"),
@@ -71,6 +72,10 @@ fun SettingsScreen(
     onBack: () -> Unit,
     onUpdate: ((HudPreferences) -> HudPreferences) -> Unit,
     onScanPids: suspend () -> List<com.wrxhud.obd.PidScanRow> = { emptyList() },
+    onReadDtcs: suspend () -> com.wrxhud.obd.DtcReadResult = {
+        com.wrxhud.obd.DtcReadResult(message = "Not connected")
+    },
+    onClearDtcs: suspend () -> Boolean = { false },
     connectionStatus: String = "",
     onRecalibrateMotion: () -> Unit = {}
 ) {
@@ -171,6 +176,12 @@ fun SettingsScreen(
                 SettingsTab.PID_LOG -> PidScanLogSection(
                     preferences = preferences,
                     onUpdate = onUpdate
+                )
+                SettingsTab.CODES -> DtcCodesSection(
+                    useSimulator = preferences.useSimulator,
+                    connectionStatus = connectionStatus,
+                    onReadDtcs = onReadDtcs,
+                    onClearDtcs = onClearDtcs
                 )
                 SettingsTab.GAUGES -> GaugesTab(preferences, onUpdate)
                 SettingsTab.LAMPS -> LampsTab(preferences, onUpdate)

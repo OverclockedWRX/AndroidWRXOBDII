@@ -39,7 +39,24 @@ Download sideload APKs from **[GitHub Releases](https://github.com/OverclockedWR
 2. On the last wizard page, grant Bluetooth / location / notification permissions.
 3. Pair the OBDLink MX+ in Android Bluetooth settings if using a live car.
 4. Turn **off** simulator in Settings to connect live.
-5. Android Auto: open WRX Race HUD from the AA launcher for gauges.
+5. Android Auto: see below — Car App Library apps do **not** appear from a plain `adb` sideload.
+
+## Android Auto
+
+The app includes a template HUD (`WrxCarAppService` / `HudCarScreen`) for Android Auto.
+
+**Why it may not show on the car screen**
+
+Google only launches **Car App Library** apps that were installed from a *trusted source* (Play Store, Internal Testing track, or Internal App Sharing). The Android Auto “Unknown sources” developer option does **not** apply to these apps — so an `adb install` debug APK will run on the phone but typically never appear in the AA launcher.
+
+**What to do for the WRX head unit**
+
+1. Upload the APK via [Play Console → Internal app sharing](https://play.google.com/console/about/internalappsharing/) or an Internal Testing track (private app is fine).
+2. Install that shared build on the phone (not the adb APK).
+3. Enable Android Auto developer mode (About → tap Version 10×) if you need DHU / extra options.
+4. Connect AA and open **WRX Race HUD** from the launcher.
+
+**Desktop Head Unit (DHU)** can run the adb debug build for UI testing without Play.
 
 ## Vehicle notes
 

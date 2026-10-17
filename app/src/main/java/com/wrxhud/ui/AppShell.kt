@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.wrxhud.hud.HudScreen
 import com.wrxhud.hud.HudUiState
+import com.wrxhud.obd.DtcReadResult
 import com.wrxhud.obd.PidScanRow
 import com.wrxhud.settings.SettingsScreen
 
@@ -15,6 +16,8 @@ fun AppShell(
     ui: HudUiState,
     onUpdatePreferences: ((com.wrxhud.settings.HudPreferences) -> com.wrxhud.settings.HudPreferences) -> Unit,
     onScanPids: suspend () -> List<PidScanRow> = { emptyList() },
+    onReadDtcs: suspend () -> DtcReadResult = { DtcReadResult(message = "Not connected") },
+    onClearDtcs: suspend () -> Boolean = { false },
     connectionStatus: String = ui.connectionStatus,
     onRecalibrateMotion: () -> Unit = {},
     onToggleLogging: () -> Unit = {}
@@ -27,6 +30,8 @@ fun AppShell(
             onBack = { showSettings = false },
             onUpdate = onUpdatePreferences,
             onScanPids = onScanPids,
+            onReadDtcs = onReadDtcs,
+            onClearDtcs = onClearDtcs,
             connectionStatus = connectionStatus,
             onRecalibrateMotion = {
                 showSettings = false

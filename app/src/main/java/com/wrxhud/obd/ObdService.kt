@@ -260,27 +260,51 @@ class ObdService : Service() {
      * Returns empty list if not connected to a live adapter.
      */
     suspend fun scanPids(): List<PidScanRow> {
+        val assignments = settingsRepository.preferencesFlow.first().pidAssignments
+        return withPausedPoller(statusWhileBusy = "Scanning PIDs…") { conn ->
+            PidScanner(conn, assignments).scan()
+        }.orEmpty()
+    }
+
+    /** Read stored / pending / permanent DTCs (Modes 03 / 07 / 0A). */
+    suspend fun readDtcs(): DtcReadResult {
+        return withPausedPoller(statusWhileBusy = "Reading DTCs…") { conn ->
+            DtcReader(conn).readAll()
+        } ?: DtcReadResult(message = "Not connected — turn off simulator and link MX+")
+    }
+
+    /**
+     * Clear emission DTCs (Mode 04). Caller must confirm with the user first.
+     * @return true when the adapter accepted the clear
+     */
+    suspend fun clearDtcs(): Boolean {
+        return withPausedPoller(statusWhileBusy = "Clearing DTCs…") { conn ->
+            DtcReader(conn).clearCodes()
+        } == true
+    }
+
+    private suspend fun <T> withPausedPoller(
+        statusWhileBusy: String,
+        block: (ObdConnection) -> T
+    ): T? {
         val conn = connection
         val p = poller
         if (conn == null || !conn.isOpen || p == null) {
-            return emptyList()
+            return null
         }
-        if (scanning) return emptyList()
+        if (scanning) return null
         scanning = true
         _scanBusy.value = true
         val previousStatus = _status.value
-        _status.value = "Scanning PIDs…"
+        _status.value = statusWhileBusy
         return try {
-            val assignments = settingsRepository.preferencesFlow.first().pidAssignments
             withContext(Dispatchers.IO) {
                 suspendCoroutine { cont ->
                     scanExecutor.execute {
                         try {
                             p.pause()
-                            // Let in-flight poll command finish.
                             Thread.sleep(80)
-                            val rows = PidScanner(conn, assignments).scan()
-                            cont.resume(rows)
+                            cont.resume(block(conn))
                         } catch (t: Throwable) {
                             cont.resumeWithException(t)
                         } finally {
@@ -290,8 +314,8 @@ class ObdService : Service() {
                 }
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "PID scan failed", t)
-            emptyList()
+            Log.e(TAG, statusWhileBusy, t)
+            null
         } finally {
             scanning = false
             _scanBusy.value = false

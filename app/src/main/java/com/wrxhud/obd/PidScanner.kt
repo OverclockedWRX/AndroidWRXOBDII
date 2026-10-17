@@ -5,8 +5,10 @@ import com.wrxhud.vehicle.UnitConverters
 import com.wrxhud.vehicle.WrxProfile
 
 /**
- * One-shot scan of supported Mode 01 PIDs plus known Mode 22 probes.
+ * One-shot **read-only** scan: supported Mode 01 PIDs + Mode 22 (UDS 0x22) probes.
  * Must run on the OBD thread with the normal poller paused.
+ *
+ * Never sends write / clear / session / IO / memory services — see [ObdReadOnlyGuard].
  */
 class PidScanner(
     private val connection: ObdConnection,
@@ -15,22 +17,12 @@ class PidScanner(
     companion object {
         private const val TAG = "PidScanner"
         private const val ECU_HEADER = 0x7E0
-
-        /** Mode 22 DIDs to probe under 7E0 (oil temp / pressure suspects). */
-        val mode22Probes: List<Int> = buildList {
-            addAll(WrxProfile.oilTempCandidates.map { it.did })
-            // Extra Subaru DID probes (oil pressure / related unknowns).
-            add(0x0114)
-            add(0x0115)
-            add(0x1154)
-            add(0x1155)
-            add(0x1234)
-        }.distinct()
     }
 
     fun scan(): List<PidScanRow> {
         val supported = discoverSupportedPids()
-        Log.i(TAG, "Scanning ${supported.size} Mode 01 PIDs + Mode 22 probes")
+        val probes = WrxProfile.mode22ProbeDids
+        Log.i(TAG, "Read-only scan: ${supported.size} Mode 01 PIDs + ${probes.size} Mode 22 probes")
         val rows = mutableListOf<PidScanRow>()
 
         for (pid in supported.sorted()) {
@@ -43,13 +35,16 @@ class PidScanner(
         }
 
         connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
-        for (did in mode22Probes) {
+        var mode22Hits = 0
+        for (did in probes) {
             val raw = connection.sendCommand(ObdCommands.mode22(did))
             val data = StnParser.parseMode22(raw, did) ?: continue
             if (data.isEmpty()) continue
+            mode22Hits++
             rows += buildRow(mode = 0x22, id = did, header = ECU_HEADER, data = data)
         }
         connection.sendCommand("ATSH7DF")
+        Log.i(TAG, "Mode 22 hits: $mode22Hits / ${probes.size}")
 
         return rows
     }
