@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wrxhud.gps.SpeedLimitReading
 import com.wrxhud.sensors.MotionReading
 import com.wrxhud.settings.MotionDisplayMode
 import com.wrxhud.settings.TachVisualStyle
@@ -43,6 +44,7 @@ import kotlin.math.min
  * Full-width bar tach with frame-timed interpolation and zone coloring
  * (blue → green → amber → red toward redline), AiM-style.
  * Visual style: enhanced 3D bar, liquid water, or RPM+boost double helix.
+ * Optional SPD / LIM sit to the left of the gear box.
  */
 @Composable
 fun Tachometer(
@@ -57,6 +59,12 @@ fun Tachometer(
     visualStyle: TachVisualStyle = TachVisualStyle.BAR_3D,
     boostPsi: Float? = null,
     maxBoostPsi: Float = 22f,
+    /** Formatted speed digits; null hides the SPD tile. */
+    speedValue: String? = null,
+    speedUnit: String = "MPH",
+    /** When non-null, shows the LIM sign left of gear. */
+    speedLimit: SpeedLimitReading? = null,
+    showGear: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val maxRpm = (redline + 500).coerceAtLeast(7000).toFloat()
@@ -111,10 +119,11 @@ fun Tachometer(
         }
     }
 
+    val sideCluster = speedValue != null || speedLimit != null || showGear
     val tachHeight = when {
-        motionDisplayMode == MotionDisplayMode.TEXT -> 120.dp
-        motionVisibility.anyVisible -> 136.dp
-        else -> 132.dp
+        motionDisplayMode == MotionDisplayMode.TEXT -> if (sideCluster) 112.dp else 120.dp
+        motionVisibility.anyVisible -> if (sideCluster) 124.dp else 136.dp
+        else -> if (sideCluster) 120.dp else 132.dp
     }
 
     Row(
@@ -139,14 +148,14 @@ fun Tachometer(
                     Text(
                         text = UnitConverters.formatRpm(displayRpm),
                         color = rpmColor,
-                        fontSize = 48.sp,
+                        fontSize = if (sideCluster) 34.sp else 48.sp,
                         fontWeight = FontWeight.Bold,
                         fontFamily = FontFamily.Monospace
                     )
                     Text(
                         text = "RPM",
                         color = HudColors.TextDim,
-                        fontSize = 11.sp,
+                        fontSize = if (sideCluster) 10.sp else 11.sp,
                         fontFamily = FontFamily.Monospace
                     )
                 }
@@ -263,12 +272,30 @@ fun Tachometer(
             }
         }
 
-        GearIndicator(
-            gear = gear,
-            modifier = Modifier
-                .padding(start = 12.dp)
-                .fillMaxHeight()
-        )
+        if (sideCluster) {
+            Row(
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .fillMaxHeight(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (speedValue != null) {
+                    SpeedTile(
+                        label = "SPD",
+                        value = speedValue,
+                        unit = speedUnit,
+                        compact = true
+                    )
+                }
+                if (speedLimit != null) {
+                    SpeedLimitSign(reading = speedLimit, compact = true)
+                }
+                if (showGear) {
+                    GearIndicator(gear = gear, compact = true)
+                }
+            }
+        }
     }
 }
 

@@ -39,7 +39,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun GearIndicator(
     gear: Int?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Slightly smaller box when SPD/LIM sit beside it. */
+    compact: Boolean = false
 ) {
     val shape = RoundedCornerShape(10.dp)
     val label = UnitConverters.formatGear(gear)
@@ -77,6 +79,10 @@ fun GearIndicator(
     val borderColor = lerp(HudColors.Border, HudColors.Accent, flash.value)
     val panelColor = lerp(HudColors.Panel, HudColors.Accent.copy(alpha = 0.22f), flash.value * 0.5f)
 
+    val boxW = if (compact) 96.dp else 118.dp
+    val boxH = if (compact) 108.dp else 128.dp
+    val gearSp = if (compact) 64.sp else 80.sp
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally
@@ -84,13 +90,13 @@ fun GearIndicator(
         Text(
             text = "GEAR",
             color = HudColors.TextDim,
-            fontSize = 13.sp,
+            fontSize = if (compact) 11.sp else 13.sp,
             fontFamily = FontFamily.Monospace,
-            modifier = Modifier.padding(bottom = 6.dp)
+            modifier = Modifier.padding(bottom = if (compact) 4.dp else 6.dp)
         )
         Box(
             modifier = Modifier
-                .size(width = 118.dp, height = 128.dp)
+                .size(width = boxW, height = boxH)
                 .clip(shape)
                 .background(panelColor, shape)
                 .border(2.dp, borderColor, shape),
@@ -99,7 +105,7 @@ fun GearIndicator(
             Text(
                 text = displayed,
                 color = HudColors.TextPrimary,
-                fontSize = 80.sp,
+                fontSize = gearSp,
                 fontWeight = FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.graphicsLayer {

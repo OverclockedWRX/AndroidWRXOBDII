@@ -176,20 +176,26 @@ fun SpeedTile(
     label: String,
     value: String,
     unit: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Compact sizing for the tach row (beside gear). */
+    compact: Boolean = false
 ) {
+    val valueSp = if (compact) 28.sp else 40.sp
+    val labelSp = if (compact) 9.sp else 10.sp
+    val hPad = if (compact) 8.dp else 10.dp
+    val vPad = if (compact) 4.dp else 6.dp
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
             .background(HudColors.Panel)
             .border(1.dp, HudColors.Border, RoundedCornerShape(8.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = hPad, vertical = vPad),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = label,
             color = HudColors.TextDim,
-            fontSize = 10.sp,
+            fontSize = labelSp,
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false
@@ -199,14 +205,14 @@ fun SpeedTile(
             Text(
                 text = "000",
                 color = Color.Transparent,
-                fontSize = 40.sp,
+                fontSize = valueSp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = value,
                 color = HudColors.TextPrimary,
-                fontSize = 40.sp,
+                fontSize = valueSp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -217,7 +223,7 @@ fun SpeedTile(
         Text(
             text = unit,
             color = HudColors.TextDim,
-            fontSize = 10.sp,
+            fontSize = labelSp,
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false

@@ -31,7 +31,8 @@ private val SignBorder = Color(0xFF1A1A1A)
 @Composable
 fun SpeedLimitSign(
     reading: SpeedLimitReading,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     val shape = RoundedCornerShape(6.dp)
     val valueText = reading.limit?.toString() ?: "—"
@@ -39,20 +40,24 @@ fun SpeedLimitSign(
         SpeedUnit.MPH -> "MPH"
         SpeedUnit.KPH -> "KM/H"
     }
+    val valueSp = if (compact) 22.sp else 28.sp
+    val limSp = if (compact) 9.sp else 10.sp
+    val minW = if (compact) 44.dp else 52.dp
+    val maxW = if (compact) 60.dp else 72.dp
 
     Column(
         modifier = modifier
-            .widthIn(min = 52.dp, max = 72.dp)
+            .widthIn(min = minW, max = maxW)
             .clip(shape)
             .background(SignWhite, shape)
             .border(2.dp, SignBorder, shape)
-            .padding(horizontal = 6.dp, vertical = 4.dp),
+            .padding(horizontal = if (compact) 4.dp else 6.dp, vertical = if (compact) 3.dp else 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
             text = "LIM",
             color = SignBlack,
-            fontSize = 10.sp,
+            fontSize = limSp,
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.Bold,
             letterSpacing = 1.sp,
@@ -63,14 +68,14 @@ fun SpeedLimitSign(
             Text(
                 text = "000",
                 color = Color.Transparent,
-                fontSize = 28.sp,
+                fontSize = valueSp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
             )
             Text(
                 text = valueText,
                 color = SignBlack,
-                fontSize = 28.sp,
+                fontSize = valueSp,
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
@@ -81,7 +86,7 @@ fun SpeedLimitSign(
         Text(
             text = if (reading.limit != null) unitHint else (reading.status ?: unitHint),
             color = SignBlack.copy(alpha = 0.7f),
-            fontSize = 8.sp,
+            fontSize = if (compact) 7.sp else 8.sp,
             fontFamily = FontFamily.Monospace,
             maxLines = 1,
             softWrap = false

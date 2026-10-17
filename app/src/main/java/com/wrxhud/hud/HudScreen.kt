@@ -83,7 +83,14 @@ fun HudScreen(
 
             Spacer(Modifier.height(2.dp))
 
-            if (GaugeId.RPM in preferences.enabledGauges || GaugeId.GEAR in preferences.enabledGauges) {
+            val showTachRow = GaugeId.RPM in preferences.enabledGauges ||
+                GaugeId.GEAR in preferences.enabledGauges ||
+                GaugeId.SPEED in preferences.enabledGauges ||
+                preferences.showSpeedLimit
+
+            if (showTachRow) {
+                val speedMps = snapshot.gpsSpeedMps
+                    ?: snapshot.obdSpeedKph?.let { UnitConverters.kphToMps(it) }
                 Tachometer(
                     rpm = if (GaugeId.RPM in preferences.enabledGauges) snapshot.rpm else null,
                     previousRpm = snapshot.previousRpm,
@@ -99,7 +106,15 @@ fun HudScreen(
                     ),
                     visualStyle = preferences.tachVisualStyle,
                     boostPsi = snapshot.boostPsi,
-                    maxBoostPsi = preferences.boostRedPsi
+                    maxBoostPsi = preferences.boostRedPsi,
+                    speedValue = if (GaugeId.SPEED in preferences.enabledGauges) {
+                        if (speedMps != null) UnitConverters.formatSpeed(speedMps, useMph) else ""
+                    } else {
+                        null
+                    },
+                    speedUnit = if (useMph) "MPH" else "KM/H",
+                    speedLimit = if (preferences.showSpeedLimit) speedLimit else null,
+                    showGear = GaugeId.GEAR in preferences.enabledGauges
                 )
             }
 
@@ -112,23 +127,6 @@ fun HudScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                if (GaugeId.SPEED in preferences.enabledGauges) {
-                    val speedMps = snapshot.gpsSpeedMps
-                        ?: snapshot.obdSpeedKph?.let { UnitConverters.kphToMps(it) }
-                    SpeedTile(
-                        label = "SPD",
-                        value = if (speedMps != null) {
-                            UnitConverters.formatSpeed(speedMps, useMph)
-                        } else {
-                            ""
-                        },
-                        unit = if (useMph) "MPH" else "KM/H"
-                    )
-                }
-                if (preferences.showSpeedLimit) {
-                    SpeedLimitSign(reading = speedLimit)
-                }
-
                 Row(
                     modifier = Modifier.weight(1f),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
