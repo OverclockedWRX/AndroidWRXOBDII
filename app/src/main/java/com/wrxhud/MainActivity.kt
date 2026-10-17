@@ -28,6 +28,7 @@ import com.wrxhud.hud.HudThemeController
 import com.wrxhud.hud.HudViewModel
 import com.wrxhud.onboarding.OnboardingWizard
 import com.wrxhud.ui.AppShell
+import com.wrxhud.ui.HighRefreshRate
 
 class MainActivity : ComponentActivity() {
     private val viewModel: HudViewModel by viewModels()
@@ -42,6 +43,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         keepScreenOn()
+        preferHighRefreshRate()
         hideSystemUi()
 
         setContent {
@@ -62,6 +64,7 @@ class MainActivity : ComponentActivity() {
             val view = LocalView.current
             DisposableEffect(Unit) {
                 view.keepScreenOn = true
+                HighRefreshRate.requestOnView(view)
                 onDispose { view.keepScreenOn = false }
             }
 
@@ -111,16 +114,24 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         keepScreenOn()
+        preferHighRefreshRate()
         hideSystemUi()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        if (hasFocus) hideSystemUi()
+        if (hasFocus) {
+            preferHighRefreshRate()
+            hideSystemUi()
+        }
     }
 
     private fun keepScreenOn() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+    }
+
+    private fun preferHighRefreshRate() {
+        HighRefreshRate.apply(this)
     }
 
     private fun hideSystemUi() {
