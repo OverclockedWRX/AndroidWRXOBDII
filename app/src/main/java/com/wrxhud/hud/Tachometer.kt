@@ -90,6 +90,7 @@ fun Tachometer(
     val panel = HudColors.Panel
     val border = HudColors.Border
     val boostBlue = HudColors.BoostBlue
+    val silver = HudColors.TachFill
 
     var phase by remember { mutableFloatStateOf(0f) }
     LaunchedEffect(visualStyle) {
@@ -193,6 +194,20 @@ fun Tachometer(
                                 boostBlue = boostBlue
                             )
                         }
+                        TachVisualStyle.RACE_SEG -> drawTachRaceSegments(
+                            displayRpm = displayRpm,
+                            maxRpm = maxRpm,
+                            redline = redline.toFloat(),
+                            greenZoneStart = greenEnd,
+                            amberZoneStart = amberStart,
+                            redZoneStart = redStart,
+                            trackColor = trackColor,
+                            silver = silver,
+                            green = green,
+                            amber = amber,
+                            red = red,
+                            accent = accent
+                        )
                         TachVisualStyle.BAR_3D -> {
                             val depth = size.height * 0.28f
                             val trackHeight = size.height * 0.52f

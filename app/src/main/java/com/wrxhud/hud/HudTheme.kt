@@ -142,59 +142,27 @@ private val EinkScheme = HudColorScheme(
     attitudeInk = Color(0xFFD4D0C4)
 )
 
-/**
- * Subaru / STI inspired — World Rally Blue cockpit with STI cherry red
- * (badge / stitching) and gold secondary accents.
- */
-private val SubaruScheme = HudColorScheme(
-    background = Color(0xFF070B12),
-    panel = Color(0xFF101820),
-    border = Color(0xFF3A1520),
-    textPrimary = Color(0xFFE8EEF6),
-    textDim = Color(0xFF8A96A8),
-    // STI cherry red — primary brand accent (tach redline, lamps, highlights)
-    accent = Color(0xFFD70026),
-    boostBlue = Color(0xFF2F6FED),
-    green = Color(0xFF3DDC97),
-    // STI gold remains for warn / mid zone
-    amber = Color(0xFFE8B923),
-    red = Color(0xFFC8102E),
-    tachTrack = Color(0xFF152033),
-    tachFill = Color(0xFFD6E4F5),
-    lampOff = Color(0xFF1A2838),
-    attitudeRingUpper = Color(0xFF2F6FED),
-    attitudeRingLower = Color(0xFFD70026),
-    attitudeGlow = Color(0xFFFF3B5C),
-    attitudeHorizon = Color(0xFF7A90A8),
-    attitudeFace = Color(0xFF05080E),
-    attitudeInk = Color(0xFF0A1018)
-)
-
-/**
- * Factory WRX STI digital instrument cluster — charcoal dials, cool navy wash,
- * white numerals, and STI cherry-magenta needles / gauge rings.
- */
-private val WrxClusterScheme = HudColorScheme(
-    background = Color(0xFF05070C),
-    panel = Color(0xFF0C1018),
-    border = Color(0xFF2A303C),
-    textPrimary = Color(0xFFF5F7FA),
-    textDim = Color(0xFF9AA3B0),
-    // STI logo / needle cherry (slightly magenta scarlet)
-    accent = Color(0xFFE6005C),
-    boostBlue = Color(0xFF4A90D9),
-    green = Color(0xFF4ADE80),
-    amber = Color(0xFFF5C518),
-    red = Color(0xFFE6005C),
-    tachTrack = Color(0xFF141820),
-    tachFill = Color(0xFFF0F2F5),
-    lampOff = Color(0xFF1C222C),
-    attitudeRingUpper = Color(0xFFE6005C),
-    attitudeRingLower = Color(0xFFFF4D7A),
-    attitudeGlow = Color(0xFFFF6B8A),
-    attitudeHorizon = Color(0xFFA8B0BC),
-    attitudeFace = Color(0xFF080A10),
-    attitudeInk = Color(0xFF12161E)
+/** Classic green/amber phosphor LCD (VFD-adjacent) cockpit. */
+private val RetroLcdScheme = HudColorScheme(
+    background = Color(0xFF061008),
+    panel = Color(0xFF0C1A10),
+    border = Color(0xFF1A3A22),
+    textPrimary = Color(0xFF39FF14),
+    textDim = Color(0xFF2A8A40),
+    accent = Color(0xFFFFB000),
+    boostBlue = Color(0xFF33D17A),
+    green = Color(0xFF39FF14),
+    amber = Color(0xFFFFB000),
+    red = Color(0xFFFF6A00),
+    tachTrack = Color(0xFF0A160C),
+    tachFill = Color(0xFF5CFF3A),
+    lampOff = Color(0xFF14301A),
+    attitudeRingUpper = Color(0xFF39FF14),
+    attitudeRingLower = Color(0xFFFFB000),
+    attitudeGlow = Color(0xFF7CFF55),
+    attitudeHorizon = Color(0xFF2A8A40),
+    attitudeFace = Color(0xFF040A06),
+    attitudeInk = Color(0xFF0C1A10)
 )
 
 /** Theme-aware colors for pitch / roll / G-force inclinometer rings. */
@@ -214,8 +182,7 @@ object HudColors {
             HudColorTheme.PINKY -> PinkyScheme
             HudColorTheme.NIGHT -> NightScheme
             HudColorTheme.EINK -> EinkScheme
-            HudColorTheme.SUBARU -> SubaruScheme
-            HudColorTheme.WRX_CLUSTER -> WrxClusterScheme
+            HudColorTheme.RETRO_LCD -> RetroLcdScheme
         }
 
     val Background: Color get() = scheme.background

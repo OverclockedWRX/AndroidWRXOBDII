@@ -22,7 +22,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.gps.SpeedLimitReading
 import com.wrxhud.sensors.MotionReading
-import com.wrxhud.settings.HudColorTheme
 import com.wrxhud.settings.HudPreferences
 import com.wrxhud.settings.TachVisualStyle
 import com.wrxhud.vehicle.AlarmEvaluator
@@ -51,19 +50,6 @@ fun HudScreen(
         redlineRpm = preferences.redlineRpm,
         modifier = Modifier.fillMaxSize()
     ) {
-        if (preferences.colorTheme == HudColorTheme.WRX_CLUSTER) {
-            WrxClusterHud(
-                snapshot = snapshot,
-                preferences = preferences,
-                connectionStatus = connectionStatus,
-                motion = motion,
-                speedLimit = speedLimit,
-                onOpenSettings = onOpenSettings,
-                modifier = Modifier.fillMaxSize()
-            )
-            return@DangerToManifoldHost
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()

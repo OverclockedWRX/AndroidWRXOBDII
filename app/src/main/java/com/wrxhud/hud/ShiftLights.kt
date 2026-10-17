@@ -100,6 +100,11 @@ fun ShiftLights(
                         lampOff = lampOff,
                         phase = phase + lamp.stageIndex * 0.15f
                     )
+                    TachVisualStyle.RACE_SEG -> drawLampRaceSegment(
+                        lit = lamp.lit,
+                        faceColor = face,
+                        lampOff = lampOff
+                    )
                     TachVisualStyle.BAR_3D, TachVisualStyle.HELIX -> drawLamp3dEnhanced(
                         lit = lamp.lit,
                         faceColor = face,

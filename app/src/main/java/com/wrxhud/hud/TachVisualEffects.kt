@@ -406,6 +406,126 @@ fun DrawScope.drawTach3dEnhanced(
     )
 }
 
+/**
+ * Audi R8 race-screen style: dense vertical segments, silver fill, permanent
+ * green → amber → red shift-zone blocks near redline (bright when lit).
+ */
+fun DrawScope.drawTachRaceSegments(
+    displayRpm: Float,
+    maxRpm: Float,
+    redline: Float,
+    greenZoneStart: Float,
+    amberZoneStart: Float,
+    redZoneStart: Float,
+    trackColor: Color,
+    silver: Color,
+    green: Color,
+    amber: Color,
+    red: Color,
+    accent: Color
+) {
+    val h = size.height * 0.72f
+    val top = (size.height - h) / 2f
+    val w = size.width
+    val segCount = 52
+    val gap = 2.2f
+    val segW = ((w - gap * (segCount - 1)) / segCount).coerceAtLeast(2f)
+    val litCount = ((displayRpm / maxRpm).coerceIn(0f, 1f) * segCount).toInt()
+
+    // Track plate
+    drawRoundRect(
+        color = trackColor,
+        topLeft = Offset(0f, top - 2f),
+        size = Size(w, h + 4f),
+        cornerRadius = CornerRadius(4f, 4f)
+    )
+
+    for (i in 0 until segCount) {
+        val x = i * (segW + gap)
+        val rpmAt = (i + 0.5f) / segCount * maxRpm
+        val lit = i < litCount
+        val zoneColor = when {
+            rpmAt >= redZoneStart -> red
+            rpmAt >= amberZoneStart -> amber
+            rpmAt >= greenZoneStart -> green
+            else -> silver
+        }
+        val face = when {
+            // Permanent dim redline segments (R8 9–10 style)
+            rpmAt >= redline && !lit -> red.copy(alpha = 0.35f)
+            lit && rpmAt >= greenZoneStart -> zoneColor
+            lit -> silver
+            else -> Color(0xFF2A2E34).copy(alpha = 0.85f)
+        }
+        val segH = if (lit) h else h * 0.88f
+        val segTop = top + (h - segH) / 2f
+        drawRoundRect(
+            color = face,
+            topLeft = Offset(x, segTop),
+            size = Size(segW, segH),
+            cornerRadius = CornerRadius(1.5f, 1.5f)
+        )
+        if (lit) {
+            drawRoundRect(
+                brush = Brush.verticalGradient(
+                    listOf(Color.White.copy(alpha = 0.55f), Color.Transparent)
+                ),
+                topLeft = Offset(x, segTop),
+                size = Size(segW, segH * 0.4f),
+                cornerRadius = CornerRadius(1.5f, 1.5f)
+            )
+        }
+    }
+
+    // Tip glow at leading lit segment
+    if (litCount in 1..segCount) {
+        val tipX = (litCount - 1) * (segW + gap) + segW / 2f
+        drawCircle(
+            color = Color.White.copy(alpha = 0.45f),
+            radius = h * 0.22f,
+            center = Offset(tipX, top + h / 2f)
+        )
+    }
+
+    val redlineX = (redline / maxRpm).coerceIn(0f, 1f) * w
+    drawLine(accent, Offset(redlineX, top - 4f), Offset(redlineX, top + h + 4f), 2.5f)
+}
+
+fun DrawScope.drawLampRaceSegment(
+    lit: Boolean,
+    faceColor: Color,
+    lampOff: Color
+) {
+    val gap = 2.dp.toPx()
+    val cols = 3
+    val rows = 2
+    val cellW = (size.width - gap * (cols - 1)) / cols
+    val cellH = (size.height - gap * (rows - 1)) / rows
+    for (row in 0 until rows) {
+        for (col in 0 until cols) {
+            val x = col * (cellW + gap)
+            val y = row * (cellH + gap)
+            val color = if (lit) faceColor else lampOff
+            drawRoundRect(
+                color = color,
+                topLeft = Offset(x, y),
+                size = Size(cellW, cellH),
+                cornerRadius = CornerRadius(1.5f, 1.5f)
+            )
+            if (lit) {
+                drawRoundRect(
+                    brush = Brush.verticalGradient(
+                        listOf(Color.White.copy(alpha = 0.5f), Color.Transparent)
+                    ),
+                    topLeft = Offset(x, y),
+                    size = Size(cellW, cellH * 0.45f),
+                    cornerRadius = CornerRadius(1.5f, 1.5f)
+                )
+            }
+        }
+    }
+}
+
 fun DrawScope.drawLamp3dEnhanced(
     lit: Boolean,
     faceColor: Color,

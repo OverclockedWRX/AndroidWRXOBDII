@@ -8,10 +8,8 @@ enum class HudColorTheme {
     PINKY,
     NIGHT,
     EINK,
-    /** Rally blue + STI cherry red (and gold) on a dark cockpit. */
-    SUBARU,
-    /** Factory WRX STI digital cluster — black dials, white ticks, cherry needles. */
-    WRX_CLUSTER;
+    /** Phosphor green + amber LCD / VFD look. */
+    RETRO_LCD;
 
     val label: String
         get() = when (this) {
@@ -19,8 +17,7 @@ enum class HudColorTheme {
             PINKY -> "Pinky"
             NIGHT -> "Night"
             EINK -> "E-ink day"
-            SUBARU -> "Subaru"
-            WRX_CLUSTER -> "WRX cluster"
+            RETRO_LCD -> "Retro LCD"
         }
 
     companion object {
@@ -42,13 +39,16 @@ enum class TachVisualStyle {
     /** Liquid-water fill, same zone colors. */
     LIQUID,
     /** Double helix: RPM strand + boost strand across the tach. */
-    HELIX;
+    HELIX,
+    /** R8-style segmented race bar with green/amber/red shift zones. */
+    RACE_SEG;
 
     val label: String
         get() = when (this) {
             BAR_3D -> "3D bar"
             LIQUID -> "Liquid"
             HELIX -> "RPM+Boost helix"
+            RACE_SEG -> "Race segments"
         }
 
     companion object {

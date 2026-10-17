@@ -290,7 +290,7 @@ private fun LookTab(
         }
     }
     Text(
-        "WRX cluster = full 2025 STI-style dials (circular tach + boost inset, center speed, speedo). Subaru = rally palette on the bar HUD.",
+        "Night dims chromas; E-ink is cream/black daylight; Retro LCD is phosphor green + amber.",
         color = HudColors.TextDim,
         fontSize = 11.sp,
         fontFamily = FontFamily.Monospace,
@@ -320,7 +320,7 @@ private fun LookTab(
         }
     }
     Text(
-        "Liquid = water-like fill (same zone colors). Helix = RPM + boost double helix (hides separate Boost tile).",
+        "Liquid = water fill. Helix = RPM+boost strands. Race segments = R8-style blocks with green/amber/red shift zones.",
         color = HudColors.TextDim,
         fontSize = 11.sp,
         fontFamily = FontFamily.Monospace,
