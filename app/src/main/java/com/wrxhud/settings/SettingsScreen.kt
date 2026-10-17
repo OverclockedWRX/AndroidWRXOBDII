@@ -290,7 +290,7 @@ private fun LookTab(
         }
     }
     Text(
-        "WRX cluster matches the factory STI dials (white ticks, cherry needles). Subaru is rally blue + cherry.",
+        "WRX cluster = full 2025 STI-style dials (circular tach + boost inset, center speed, speedo). Subaru = rally palette on the bar HUD.",
         color = HudColors.TextDim,
         fontSize = 11.sp,
         fontFamily = FontFamily.Monospace,
