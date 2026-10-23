@@ -2,7 +2,14 @@
 
 Android 15+ race instrument / HUD for **2022–present Subaru WRX (VB / FA24)** using an **OBDLink MX+**.
 
+![WRX Race HUD in action](docs/hud-demo.gif)
+
+<details>
+<summary>Still frame</summary>
+
 ![WRX Race HUD instrument screen](docs/hud-screenshot.png)
+
+</details>
 
 ## Features
 
