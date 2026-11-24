@@ -2,11 +2,11 @@
 
 APKs are **not** stored in git (avoids GitHub’s large-file warnings).
 
-Download private builds from **GitHub Releases**:
+Download builds from **GitHub Releases**:
 
 https://github.com/OverclockedWRX/AndroidWRXOBDII/releases
 
-Only collaborators on this private repo can see or download them.
+Anyone can download them; the code is MIT licensed (see ../LICENSE).
 
 ### Publishing a new build (maintainers)
 

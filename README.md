@@ -45,7 +45,7 @@ Open the project in Android Studio (Ladybug or newer) or:
 ./gradlew :app:assembleDebug
 ```
 
-Download sideload APKs from **[GitHub Releases](https://github.com/OverclockedWRX/AndroidWRXOBDII/releases)** (private — collaborators only). Or build locally with Gradle (`app/build/outputs/apk/debug/`). APKs are not committed to git.
+Download sideload APKs from **[GitHub Releases](https://github.com/OverclockedWRX/AndroidWRXOBDII/releases)**. Or build locally with Gradle (`app/build/outputs/apk/debug/`). APKs are not committed to git.
 
 ## First run
 
@@ -99,4 +99,4 @@ To confirm manually with an MX+ terminal (or Torque custom PID test):
 
 ## License
 
-Private project. All rights reserved unless otherwise noted.
+MIT. See [LICENSE](LICENSE).
