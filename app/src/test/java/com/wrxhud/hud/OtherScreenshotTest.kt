@@ -119,7 +119,7 @@ class GearFlipScreenshotTest(
         @JvmStatic
         @ParameterizedRobolectricTestRunner.Parameters(name = "{0}-{1}")
         fun params(): List<Array<Any>> = buildList {
-            for (t in HudColorTheme.entries) for (ms in listOf(64L, 200L)) add(arrayOf(t, ms))
+            for (t in HudColorTheme.entries) for (ms in listOf(64L, 140L, 200L)) add(arrayOf(t, ms))
         }
     }
 
@@ -135,8 +135,7 @@ class GearFlipScreenshotTest(
             advanceMs = 300,
             content = { GearIndicator(gear = gear, compact = false) },
             beforeCapture = { r ->
-                gear = 3
-                r.mainClock.advanceTimeBy(afterMs)
+                ShotHarness.change(r, afterMs) { gear = 3 }
             }
         )
     }

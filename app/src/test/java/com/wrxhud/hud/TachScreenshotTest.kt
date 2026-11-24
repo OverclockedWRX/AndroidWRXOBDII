@@ -80,8 +80,7 @@ class TachScreenshotTest(
                     MotionReading(0f, 0f, 0f, 0.5f, -0.2f, 0.3f, true)
                 )
                 for (m in seq) {
-                    reading.value = m
-                    r.mainClock.advanceTimeBy(100)
+                    ShotHarness.change(r, 100) { reading.value = m }
                 }
             }
         )

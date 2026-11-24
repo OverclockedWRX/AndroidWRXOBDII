@@ -13,6 +13,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import org.robolectric.Shadows.shadowOf
 import kotlin.math.roundToInt
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
@@ -88,6 +89,13 @@ object ShotHarness {
             }
         }
         log("VERIFY $name maxDiff=$maxDiff differingPixels=$differing/${w * h}")
+        if (maxDiff > TOLERANCE) {
+            // Keep the failing render next to the report for inspection.
+            val out = File(report.parentFile, "screenshot-actual").apply { mkdirs() }
+            val bi = BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB)
+            bi.setRGB(0, 0, w, h, px, 0, w)
+            ImageIO.write(bi, "png", File(out, "$name.png"))
+        }
         return if (maxDiff > TOLERANCE) "$name differs: maxDiff=$maxDiff pixels=$differing" else null
     }
 
@@ -107,6 +115,16 @@ object ShotHarness {
         val w = bounds.width.roundToInt().coerceAtMost(full.width - l)
         val h = bounds.height.roundToInt().coerceAtMost(full.height - t)
         return Bitmap.createBitmap(full, l, t, w, h).asImageBitmap()
+    }
+
+    /**
+     * Changes state from the test thread and lets Compose see it: with the main clock paused
+     * the apply notification is otherwise never delivered, so nothing would recompose.
+     */
+    fun change(rule: ComposeContentTestRule, advanceMs: Long, block: () -> Unit) {
+        block()
+        Snapshot.sendApplyNotifications()
+        rule.mainClock.advanceTimeBy(advanceMs)
     }
 
     /** Shared scene wrapper: theme palette, fixed size, dark theme background. */
