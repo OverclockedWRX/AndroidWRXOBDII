@@ -14,7 +14,7 @@ object VehicleInfoReader {
     private const val UDS_VIN_DID = 0xF190
 
     fun read(
-        connection: ObdConnection,
+        connection: ObdLink,
         oilTempSource: String? = null,
         mapSource: String? = null
     ): VehicleInfo {

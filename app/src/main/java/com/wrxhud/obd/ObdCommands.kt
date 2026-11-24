@@ -38,6 +38,23 @@ object ObdCommands {
     /** SAE Mode 01 — show current data (read). */
     fun mode01(pid: Int): String = "01%02X".format(pid)
 
+    /**
+     * Multi-PID Mode 01 request (up to 6 PIDs on CAN), e.g. `010C0D11`.
+     * [countHint] is the ELM327/STN response-count digit (`010C1`): the adapter returns
+     * after that many ECU replies instead of waiting out its timeout.
+     */
+    fun mode01Multi(pids: List<Int>, countHint: Int? = null): String {
+        require(pids.size in 1..MAX_MODE01_BATCH) { "1..$MAX_MODE01_BATCH PIDs per request" }
+        return buildString {
+            append("01")
+            pids.forEach { append("%02X".format(it)) }
+            if (countHint != null) append("%X".format(countHint))
+        }
+    }
+
+    /** Most PIDs one Mode 01 request may carry (SAE J1979). */
+    const val MAX_MODE01_BATCH = 6
+
     /** SAE Mode 09 — vehicle information (VIN, CALID, ECU name) — read. */
     fun mode09(pid: Int): String = "09%02X".format(pid)
 

@@ -58,6 +58,9 @@ object TelemetryRepository {
     private val _rawVehicleInfo = MutableStateFlow(VehicleInfo())
     val rawVehicleInfo: StateFlow<VehicleInfo> = _rawVehicleInfo.asStateFlow()
 
+    private val _pollStats = MutableStateFlow(com.wrxhud.obd.PollStats())
+    val pollStats: StateFlow<com.wrxhud.obd.PollStats> = _pollStats.asStateFlow()
+
     // Derived display values.
     private val _snapshot = MutableStateFlow(VehicleSnapshot())
     val snapshot: StateFlow<VehicleSnapshot> = _snapshot.asStateFlow()
@@ -127,6 +130,7 @@ object TelemetryRepository {
     fun publishObd(frame: VehicleSnapshot) { _obd.value = frame }
     fun publishObdStatus(status: String) { _obdStatus.value = status }
     fun publishVehicleInfo(info: VehicleInfo) { _rawVehicleInfo.value = info }
+    fun publishPollStats(stats: com.wrxhud.obd.PollStats) { _pollStats.value = stats }
 
     /** Last raw OBD frame (service side use, e.g. phone-only idle). */
     fun currentObd(): VehicleSnapshot = _obd.value

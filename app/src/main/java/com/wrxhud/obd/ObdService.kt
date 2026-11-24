@@ -255,7 +255,7 @@ class ObdService : Service() {
                 settingsRepository.preferencesFlow.collect { latestPrefs = it }
             }
             val pollerInstance = ObdPoller(
-                connection = conn,
+                connection = ObdConnectionLink(conn),
                 scope = scope,
                 connectionLock = connectionLock,
                 gearConfigProvider = {
@@ -274,11 +274,15 @@ class ObdService : Service() {
                     g.speedMps to g.hasFix
                 },
                 thresholdsProvider = { latestPrefs.toAlarmThresholds() },
-                assignmentsProvider = { latestPrefs.pidAssignments }
+                assignmentsProvider = { latestPrefs.pidAssignments },
+                pollingModeProvider = { latestPrefs.pollingMode }
             )
             poller = pollerInstance
             val infoJob = launch {
                 pollerInstance.vehicleInfo.collect { info -> repo.publishVehicleInfo(info) }
+            }
+            val statsJob = launch {
+                pollerInstance.pollStats.collect { repo.publishPollStats(it) }
             }
             val frameJob = launch {
                 pollerInstance.snapshot.collect { frame ->
@@ -291,6 +295,8 @@ class ObdService : Service() {
                 pollJob.join()
             } finally {
                 frameJob.cancel()
+                statsJob.cancel()
+                repo.publishPollStats(PollStats())
                 infoJob.cancel()
                 prefsWatcher.cancel()
                 pollerInstance.stop()

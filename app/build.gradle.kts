@@ -13,8 +13,8 @@ android {
         applicationId = "com.wrxhud"
         minSdk = 35
         targetSdk = 36
-        versionCode = 34
-        versionName = "0.34.0-dev"
+        versionCode = 35
+        versionName = "0.35.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -36,6 +36,11 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    testOptions {
+        // android.util.Log in poller code must not throw under plain JVM unit tests.
+        unitTests.isReturnDefaultValues = true
     }
 
     packaging {

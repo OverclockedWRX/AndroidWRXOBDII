@@ -39,6 +39,7 @@ class SettingsRepository(private val context: Context) {
         val tireAspect = intPreferencesKey("tire_aspect")
         val wheelIn = intPreferencesKey("wheel_in")
         val useSim = booleanPreferencesKey("use_sim")
+        val pollingMode = stringPreferencesKey("polling_mode")
         val pinkyMode = booleanPreferencesKey("pinky_mode")
         val colorTheme = stringPreferencesKey("color_theme")
         val dangerToManifold = booleanPreferencesKey("danger_to_manifold")
@@ -93,6 +94,7 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.tireAspect] = next.tireAspect
             prefs[Keys.wheelIn] = next.wheelDiameterIn
             prefs[Keys.useSim] = next.useSimulator
+            prefs[Keys.pollingMode] = next.pollingMode.name
             prefs[Keys.pinkyMode] = next.colorTheme == HudColorTheme.PINKY
             prefs[Keys.colorTheme] = next.colorTheme.name
             prefs[Keys.dangerToManifold] = next.dangerToManifold
@@ -164,6 +166,7 @@ class SettingsRepository(private val context: Context) {
             tireAspect = this[Keys.tireAspect] ?: defaults.tireAspect,
             wheelDiameterIn = this[Keys.wheelIn] ?: defaults.wheelDiameterIn,
             useSimulator = this[Keys.useSim] ?: defaults.useSimulator,
+            pollingMode = PollingMode.fromStored(this[Keys.pollingMode]),
             pinkyMode = this[Keys.pinkyMode] ?: defaults.pinkyMode,
             colorTheme = HudColorTheme.fromStored(
                 this[Keys.colorTheme],

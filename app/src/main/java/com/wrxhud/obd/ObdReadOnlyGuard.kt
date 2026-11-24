@@ -7,7 +7,7 @@ import android.util.Log
  *
  * Allowed:
  * - ELM/STN adapter setup (`AT*`, `ST*`)
- * - SAE Mode 01 current data (`01xx`)
+ * - SAE Mode 01 current data (`01xx`, multi-PID `01xxyyzz`, response-count suffix `010C1`)
  * - SAE Mode 03 / 07 / 0A DTC reads
  * - SAE Mode 09 vehicle information (`09xx`) — VIN / CALID / ECU name (read)
  * - SAE Mode 04 clear DTCs (user-confirmed code reader only — not calibration write)
@@ -46,6 +46,8 @@ object ObdReadOnlyGuard {
 
             // --- Vehicle bus: diagnostic reads ---
             c.matches(Regex("^01[0-9A-F]{2}$")) -> true
+            // Multi-PID read (up to 6 PIDs) with optional ELM response-count digit 1..F.
+            c.matches(Regex("^01([0-9A-F]{2}){1,6}[1-9A-F]?$")) -> true
             c == "03" || c == "07" || c == "0A" -> true
             // Mode 09 vehicle information (VIN, CALID, ECU name) — read only
             c.matches(Regex("^09[0-9A-F]{2}$")) -> true

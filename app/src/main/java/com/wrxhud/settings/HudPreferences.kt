@@ -25,6 +25,23 @@ enum class ShiftLightPattern {
         }
 }
 
+/** How the OBD poller talks to the adapter. */
+enum class PollingMode(val label: String, val description: String) {
+    FAST(
+        "Fast",
+        "Response-count hint, multi-PID batching on CAN, grouped Mode 22 header switches."
+    ),
+    LEGACY(
+        "Legacy",
+        "One request per PID, one Mode 22 header switch each. Original command stream."
+    );
+
+    companion object {
+        fun fromStored(name: String?): PollingMode =
+            entries.firstOrNull { it.name == name } ?: FAST
+    }
+}
+
 data class HudPreferences(
     val onboardingComplete: Boolean = false,
     val enabledGauges: Set<GaugeId> = setOf(
@@ -65,6 +82,8 @@ data class HudPreferences(
     val tireAspect: Int = WrxProfile.DEFAULT_TIRE_ASPECT,
     val wheelDiameterIn: Int = WrxProfile.DEFAULT_WHEEL_DIAMETER_IN,
     val useSimulator: Boolean = false,
+    /** OBD polling strategy; FAST is the default, LEGACY = pre-0.35 command stream. */
+    val pollingMode: PollingMode = PollingMode.FAST,
     /** @deprecated Migrated into [colorTheme]; kept for DataStore upgrade path. */
     val pinkyMode: Boolean = false,
     /** Global HUD color palette (classic / pinky / night / e-ink). */
