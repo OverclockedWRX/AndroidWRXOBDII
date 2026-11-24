@@ -20,6 +20,7 @@ import androidx.core.content.ContextCompat
 import com.wrxhud.MainActivity
 import com.wrxhud.R
 import com.wrxhud.settings.SettingsRepository
+import com.wrxhud.telemetry.TelemetryRepository
 import com.wrxhud.vehicle.AlarmEvaluator
 import com.wrxhud.vehicle.VehicleInfo
 import com.wrxhud.vehicle.VehicleSnapshot
@@ -32,12 +33,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import java.util.concurrent.Executors
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
-import kotlin.coroutines.suspendCoroutine
 
 class ObdService : Service() {
     companion object {
@@ -55,9 +55,9 @@ class ObdService : Service() {
 
     private val binder = LocalBinder()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val scanExecutor = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "obd-scan").apply { isDaemon = true }
-    }
+
+    /** Serialises all use of the adapter: poller (per cycle), PID scan, DTC, VIN. */
+    private val connectionLock = Mutex()
 
     private lateinit var settingsRepository: SettingsRepository
     private var connection: ObdConnection? = null
@@ -65,18 +65,12 @@ class ObdService : Service() {
     private var simJob: kotlinx.coroutines.Job? = null
     private var liveJob: kotlinx.coroutines.Job? = null
 
-    private val _snapshot = MutableStateFlow(VehicleSnapshot())
-    val snapshot: StateFlow<VehicleSnapshot> = _snapshot.asStateFlow()
-
-    private val _vehicleInfo = MutableStateFlow(VehicleInfo())
-    val vehicleInfo: StateFlow<VehicleInfo> = _vehicleInfo.asStateFlow()
-
-    private val _status = MutableStateFlow("Idle")
-    val status: StateFlow<String> = _status.asStateFlow()
+    private val repo = TelemetryRepository
 
     private val _scanBusy = MutableStateFlow(false)
     val scanBusy: StateFlow<Boolean> = _scanBusy.asStateFlow()
-    @Volatile private var scanning = false
+
+    private fun setStatus(text: String) = repo.publishObdStatus(text)
 
     override fun onCreate() {
         super.onCreate()
@@ -107,8 +101,8 @@ class ObdService : Service() {
 
     override fun onDestroy() {
         stopSession(publishIdle = false)
+        repo.dataLog.stop()
         scope.cancel()
-        scanExecutor.shutdownNow()
         super.onDestroy()
     }
 
@@ -127,38 +121,44 @@ class ObdService : Service() {
             .setOngoing(true)
             .build()
         // Simulator has no BT/USB device — connectedDevice can SecurityException on API 34+.
-        val type = if (useSimulator) {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        val types = if (useSimulator) {
+            listOf(ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
         } else {
-            ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-        }
-        try {
-            ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
-        } catch (t: Throwable) {
-            Log.e(TAG, "startForeground($type) failed; retrying specialUse", t)
-            ServiceCompat.startForeground(
-                this,
-                NOTIFICATION_ID,
-                notification,
+            // location keeps GPS updates flowing for Android Auto with the phone UI closed.
+            listOf(
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             )
         }
+        var lastError: Throwable? = null
+        for (type in types) {
+            try {
+                ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, type)
+                return
+            } catch (t: Throwable) {
+                lastError = t
+                Log.e(TAG, "startForeground($type) failed; trying fallback type", t)
+            }
+        }
+        throw lastError ?: IllegalStateException("startForeground failed")
     }
 
     private fun startSimulator() {
         stopSession(publishIdle = false)
-        _status.value = "Simulator"
+        setStatus("Simulator")
         simJob = scope.launch {
             // Re-check preference so a stale START cannot keep sim running after disable.
             val prefs = settingsRepository.preferencesFlow.first()
             if (!prefs.useSimulator) {
-                _status.value = "Simulator disabled"
+                setStatus("Simulator disabled")
                 publishPhoneOnlyIdle()
                 return@launch
             }
-            _vehicleInfo.value = VehicleInfoReader.simulatorPlaceholder()
+            repo.publishVehicleInfo(VehicleInfoReader.simulatorPlaceholder())
             SimulatedObdSource(thresholds = prefs.toAlarmThresholds()).snapshots().collect { frame ->
-                _snapshot.value = frame
+                repo.publishObd(frame)
             }
         }
     }
@@ -173,95 +173,132 @@ class ObdService : Service() {
                 return@launch
             }
             publishPhoneOnlyIdle()
-            try {
-                if (ContextCompat.checkSelfPermission(
-                        this@ObdService,
-                        Manifest.permission.BLUETOOTH_CONNECT
-                    ) != PackageManager.PERMISSION_GRANTED
-                ) {
-                    _status.value = "Bluetooth permission required"
-                    publishPhoneOnlyIdle()
-                    return@launch
-                }
-                _status.value = "Connecting…"
-                val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
-                val adapter = bluetoothManager.adapter
-                    ?: run {
-                        _status.value = "Bluetooth unavailable"
-                        publishPhoneOnlyIdle()
-                        return@launch
-                    }
-                if (!adapter.isEnabled) {
-                    _status.value = "Bluetooth disabled"
-                    publishPhoneOnlyIdle()
-                    return@launch
-                }
-                val conn = ObdConnection(adapter)
-                connection = conn
-                val device = try {
-                    conn.findMxPlus()
-                } catch (se: SecurityException) {
-                    _status.value = "Bluetooth permission required"
-                    publishPhoneOnlyIdle()
-                    return@launch
-                } ?: run {
-                    _status.value = "No OBDLink MX+ — GPS only"
-                    publishPhoneOnlyIdle()
-                    return@launch
-                }
-                conn.connect(device)
-                _status.value = "Connected: ${device.name}"
-
-                var latestPrefs = settingsRepository.preferencesFlow.first()
-                val prefsWatcher = launch {
-                    settingsRepository.preferencesFlow.collect { latestPrefs = it }
-                }
-                val pollerInstance = ObdPoller(
-                    connection = conn,
-                    scope = scope,
-                    gearConfigProvider = {
-                        val p = latestPrefs
-                        ObdPoller.GearConfig(
-                            transmission = if (p.useSptCvt) WrxProfile.sptCvt else WrxProfile.manual6,
-                            tireCircumferenceM = WrxProfile.tireCircumferenceMeters(
-                                p.tireWidthMm,
-                                p.tireAspect,
-                                p.wheelDiameterIn
-                            )
-                        )
-                    },
-                    gpsSpeedProvider = {
-                        val s = _snapshot.value
-                        s.gpsSpeedMps to s.gpsHasFix
-                    },
-                    thresholdsProvider = { latestPrefs.toAlarmThresholds() },
-                    assignmentsProvider = { latestPrefs.pidAssignments }
-                )
-                poller = pollerInstance
-                launch {
-                    pollerInstance.vehicleInfo.collect { info ->
-                        _vehicleInfo.value = info
-                    }
-                }
-                launch {
-                    try {
-                        pollerInstance.snapshot.collect { frame ->
-                            if (latestPrefs.useSimulator) return@collect
-                            _snapshot.value = frame.copy(usingSimulator = false)
-                        }
-                    } finally {
-                        prefsWatcher.cancel()
-                    }
-                }
-                pollerInstance.start()
-            } catch (t: Throwable) {
-                Log.e(TAG, "Live OBD failed", t)
-                _status.value = when (t) {
-                    is SecurityException -> "Bluetooth permission required"
-                    else -> "Error: ${t.message}"
-                }
+            setStatus("Connecting…")
+            ReconnectLoop(onStatus = { text ->
+                setStatus(text)
                 publishPhoneOnlyIdle()
+            }).run { markConnected ->
+                try {
+                    liveSession(markConnected)
+                } catch (ce: kotlinx.coroutines.CancellationException) {
+                    throw ce
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Live OBD failed", t)
+                    if (t is SecurityException) {
+                        setStatus("Bluetooth permission required")
+                        publishPhoneOnlyIdle()
+                        SessionEnd.GIVE_UP
+                    } else {
+                        SessionEnd.RETRY
+                    }
+                }
             }
+        }
+    }
+
+    /** One connect-and-poll session using the existing connect/close code. */
+    private suspend fun liveSession(markConnected: () -> Unit): SessionEnd {
+        if (settingsRepository.preferencesFlow.first().useSimulator) {
+            // Simulator switched on: stop reconnecting and hand over.
+            startSimulator()
+            return SessionEnd.GIVE_UP
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            setStatus("Bluetooth permission required")
+            publishPhoneOnlyIdle()
+            return SessionEnd.GIVE_UP
+        }
+        val bluetoothManager = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
+        val adapter = bluetoothManager.adapter
+        if (adapter == null) {
+            setStatus("Bluetooth unavailable")
+            publishPhoneOnlyIdle()
+            return SessionEnd.GIVE_UP
+        }
+        if (!adapter.isEnabled) {
+            Log.w(TAG, "Bluetooth disabled; will retry")
+            return SessionEnd.RETRY
+        }
+        val conn = ObdConnection(adapter)
+        connection = conn
+        val device = try {
+            conn.findMxPlus()
+        } catch (se: SecurityException) {
+            setStatus("Bluetooth permission required")
+            publishPhoneOnlyIdle()
+            return SessionEnd.GIVE_UP
+        }
+        if (device == null) {
+            setStatus("No OBDLink MX+ — GPS only")
+            publishPhoneOnlyIdle()
+            return SessionEnd.GIVE_UP
+        }
+        try {
+            withContext(Dispatchers.IO) { conn.connect(device) }
+        } catch (ce: kotlinx.coroutines.CancellationException) {
+            conn.close()
+            throw ce
+        } catch (t: Throwable) {
+            Log.w(TAG, "Connect failed", t)
+            conn.close()
+            if (connection === conn) connection = null
+            return SessionEnd.RETRY
+        }
+        setStatus("Connected: ${device.name}")
+        markConnected()
+
+        return coroutineScope {
+            var latestPrefs = settingsRepository.preferencesFlow.first()
+            val prefsWatcher = launch {
+                settingsRepository.preferencesFlow.collect { latestPrefs = it }
+            }
+            val pollerInstance = ObdPoller(
+                connection = conn,
+                scope = scope,
+                connectionLock = connectionLock,
+                gearConfigProvider = {
+                    val p = latestPrefs
+                    ObdPoller.GearConfig(
+                        transmission = if (p.useSptCvt) WrxProfile.sptCvt else WrxProfile.manual6,
+                        tireCircumferenceM = WrxProfile.tireCircumferenceMeters(
+                            p.tireWidthMm,
+                            p.tireAspect,
+                            p.wheelDiameterIn
+                        )
+                    )
+                },
+                gpsSpeedProvider = {
+                    val g = repo.gps.value
+                    g.speedMps to g.hasFix
+                },
+                thresholdsProvider = { latestPrefs.toAlarmThresholds() },
+                assignmentsProvider = { latestPrefs.pidAssignments }
+            )
+            poller = pollerInstance
+            val infoJob = launch {
+                pollerInstance.vehicleInfo.collect { info -> repo.publishVehicleInfo(info) }
+            }
+            val frameJob = launch {
+                pollerInstance.snapshot.collect { frame ->
+                    if (latestPrefs.useSimulator) return@collect
+                    repo.publishObd(frame.copy(usingSimulator = false))
+                }
+            }
+            val pollJob = pollerInstance.start()
+            try {
+                pollJob.join()
+            } finally {
+                frameJob.cancel()
+                infoJob.cancel()
+                prefsWatcher.cancel()
+                pollerInstance.stop()
+                if (poller === pollerInstance) poller = null
+                conn.close()
+                if (connection === conn) connection = null
+            }
+            SessionEnd.RETRY
         }
     }
 
@@ -297,51 +334,38 @@ class ObdService : Service() {
     suspend fun refreshVehicleInfo(): VehicleInfo {
         val p = poller
         if (p == null) {
-            return _vehicleInfo.value
+            return repo.rawVehicleInfo.value
         }
         return withPausedPoller(statusWhileBusy = "Reading vehicle info…") {
             p.refreshVehicleInfo()
             p.vehicleInfo.value
-        } ?: _vehicleInfo.value
+        } ?: repo.rawVehicleInfo.value
     }
 
+    /** Runs [block] with exclusive use of the adapter (poller waits on the same lock). */
     private suspend fun <T> withPausedPoller(
         statusWhileBusy: String,
         block: (ObdConnection) -> T
     ): T? {
         val conn = connection
-        val p = poller
-        if (conn == null || !conn.isOpen || p == null) {
+        if (conn == null || !conn.isOpen || poller == null) {
             return null
         }
-        if (scanning) return null
-        scanning = true
-        _scanBusy.value = true
-        val previousStatus = _status.value
-        _status.value = statusWhileBusy
+        if (!_scanBusy.compareAndSet(false, true)) return null
+        val previousStatus = repo.obdStatus.value
+        setStatus(statusWhileBusy)
         return try {
             withContext(Dispatchers.IO) {
-                suspendCoroutine { cont ->
-                    scanExecutor.execute {
-                        try {
-                            p.pause()
-                            Thread.sleep(80)
-                            cont.resume(block(conn))
-                        } catch (t: Throwable) {
-                            cont.resumeWithException(t)
-                        } finally {
-                            p.resume()
-                        }
-                    }
-                }
+                connectionLock.withLock { block(conn) }
             }
+        } catch (ce: kotlinx.coroutines.CancellationException) {
+            throw ce
         } catch (t: Throwable) {
             Log.e(TAG, statusWhileBusy, t)
             null
         } finally {
-            scanning = false
             _scanBusy.value = false
-            _status.value = previousStatus
+            setStatus(previousStatus)
         }
     }
 
@@ -356,26 +380,27 @@ class ObdService : Service() {
         poller = null
         connection?.close()
         connection = null
-        _vehicleInfo.value = VehicleInfo()
+        repo.publishVehicleInfo(VehicleInfo())
         if (publishIdle) {
-            _status.value = "Stopped"
+            setStatus("Stopped")
             publishPhoneOnlyIdle()
         }
     }
 
     private fun publishPhoneOnlyIdle() {
-        val gpsSpeed = _snapshot.value.gpsSpeedMps
-        val gpsFix = _snapshot.value.gpsHasFix
-        _snapshot.value = VehicleSnapshot(
-            timestampMs = System.currentTimeMillis(),
-            gpsSpeedMps = gpsSpeed,
-            gpsHasFix = gpsFix,
-            obdConnected = false,
-            usingSimulator = false,
-            alarms = AlarmEvaluator.evaluate(
-                VehicleSnapshot(gpsSpeedMps = gpsSpeed, gpsHasFix = gpsFix),
-                WrxProfile.AlarmThresholds(),
-                expectObd = true
+        val gps = repo.gps.value
+        repo.publishObd(
+            VehicleSnapshot(
+                timestampMs = System.currentTimeMillis(),
+                gpsSpeedMps = gps.speedMps,
+                gpsHasFix = gps.hasFix,
+                obdConnected = false,
+                usingSimulator = false,
+                alarms = AlarmEvaluator.evaluate(
+                    VehicleSnapshot(gpsSpeedMps = gps.speedMps, gpsHasFix = gps.hasFix),
+                    WrxProfile.AlarmThresholds(),
+                    expectObd = true
+                )
             )
         )
     }

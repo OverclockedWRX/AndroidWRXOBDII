@@ -14,7 +14,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
@@ -47,18 +50,22 @@ class MainActivity : ComponentActivity() {
         hideSystemUi()
 
         setContent {
-            val ui by viewModel.uiState.collectAsState()
-            val rawMotion by viewModel.rawMotion.collectAsState()
+            // Root observes only two booleans and the theme key; everything else is
+            // collected by the screen that draws it.
+            val onboardingComplete by viewModel.onboardingComplete.collectAsStateWithLifecycle()
+            val motionCalibrated by viewModel.motionCalibrated.collectAsStateWithLifecycle()
+            val colorTheme by remember { viewModel.preferences.map { it.colorTheme }.distinctUntilChanged() }
+                .collectAsStateWithLifecycle(HudThemeController.colorTheme)
 
-            LaunchedEffect(ui.preferences.onboardingComplete) {
-                if (ui.preferences.onboardingComplete) {
-                    viewModel.startRuntimeIfNeeded(ui.preferences)
+            LaunchedEffect(onboardingComplete) {
+                if (onboardingComplete) {
+                    viewModel.startRuntimeIfNeeded(viewModel.preferences.value)
                     viewModel.ensureMotionStarted()
                 }
             }
 
             SideEffect {
-                HudThemeController.colorTheme = ui.preferences.colorTheme
+                HudThemeController.colorTheme = colorTheme
             }
 
             val view = LocalView.current
@@ -73,10 +80,12 @@ class MainActivity : ComponentActivity() {
                 color = HudColors.Background
             ) {
                 when {
-                    !ui.preferences.onboardingComplete -> {
+                    !onboardingComplete -> {
+                        val preferences by viewModel.preferences.collectAsStateWithLifecycle()
+                        val connectionStatus by viewModel.connectionStatus.collectAsStateWithLifecycle()
                         OnboardingWizard(
-                            preferences = ui.preferences,
-                            connectionStatus = ui.connectionStatus,
+                            preferences = preferences,
+                            connectionStatus = connectionStatus,
                             onUpdate = viewModel::updatePreferences,
                             onEnsureObd = viewModel::ensureObdForSetup,
                             onScanPids = { viewModel.scanPids() },
@@ -84,8 +93,10 @@ class MainActivity : ComponentActivity() {
                             onFinished = { }
                         )
                     }
-                    !ui.preferences.motionCalibrated -> {
+                    !motionCalibrated -> {
                         LaunchedEffect(Unit) { viewModel.ensureMotionStarted() }
+                        // rawMotion (~60 Hz) is collected only on this screen.
+                        val rawMotion by viewModel.rawMotion.collectAsStateWithLifecycle()
                         AttitudeCalibrationScreen(
                             motion = rawMotion,
                             getLiveMotion = { viewModel.rawMotionNow() },
@@ -95,15 +106,8 @@ class MainActivity : ComponentActivity() {
                     }
                     else -> {
                         AppShell(
-                            ui = ui,
-                            onUpdatePreferences = viewModel::updatePreferences,
-                            onScanPids = { viewModel.scanPids() },
-                            onReadDtcs = { viewModel.readDtcs() },
-                            onClearDtcs = { viewModel.clearDtcs() },
-                            onRefreshVehicleInfo = { viewModel.refreshVehicleInfo() },
-                            connectionStatus = ui.connectionStatus,
-                            onRecalibrateMotion = viewModel::clearMountCalibration,
-                            onToggleLogging = viewModel::toggleDataLog
+                            viewModel = viewModel,
+                            onRecalibrateMotion = viewModel::clearMountCalibration
                         )
                     }
                 }
@@ -172,7 +176,7 @@ class MainActivity : ComponentActivity() {
 
     private fun completeOnboardingAndStart() {
         viewModel.updatePreferences { it.copy(onboardingComplete = true) }
-        val prefs = viewModel.uiState.value.preferences.copy(onboardingComplete = true)
+        val prefs = viewModel.preferences.value.copy(onboardingComplete = true)
         viewModel.startRuntimeIfNeeded(prefs)
         viewModel.ensureMotionStarted()
     }

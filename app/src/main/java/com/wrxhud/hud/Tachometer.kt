@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -54,7 +55,7 @@ fun Tachometer(
     sampleAgeMs: Long,
     redline: Int,
     gear: Int?,
-    motion: MotionReading = MotionReading(),
+    motion: () -> MotionReading = { MotionReading() },
     motionDisplayMode: MotionDisplayMode = MotionDisplayMode.RINGS,
     motionVisibility: MotionGaugeVisibility = MotionGaugeVisibility(),
     visualStyle: TachVisualStyle = TachVisualStyle.BAR_3D,
@@ -149,7 +150,10 @@ fun Tachometer(
         }
     }
 
-    val showMotion = motion.available && motionVisibility.gForce
+    // Only the availability flag is read here; the ~60 Hz readings are read inside
+    // MotionClusterHost so just that small scope recomposes.
+    val motionAvailable by remember(motion) { derivedStateOf { motion().available } }
+    val showMotion = motionAvailable && motionVisibility.gForce
     val sideCluster = speedValue != null || speedLimit != null || showGear || showMotion
     val rpmValueSp = when {
         showThrottle && sideCluster -> 26.sp
@@ -395,7 +399,7 @@ fun Tachometer(
                     }
                 }
                 if (showMotion) {
-                    TachMotionCluster(
+                    MotionClusterHost(
                         motion = motion,
                         mode = motionDisplayMode,
                         visibility = motionVisibility
@@ -442,4 +446,13 @@ fun DataLogRecordButton(
             fontFamily = FontFamily.Monospace
         )
     }
+}
+
+@Composable
+private fun MotionClusterHost(
+    motion: () -> MotionReading,
+    mode: MotionDisplayMode,
+    visibility: MotionGaugeVisibility
+) {
+    TachMotionCluster(motion = motion(), mode = mode, visibility = visibility)
 }
