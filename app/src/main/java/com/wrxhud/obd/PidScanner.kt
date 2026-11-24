@@ -34,16 +34,19 @@ class PidScanner(
             rows += buildRow(mode = 0x01, id = pid, header = null, data = data)
         }
 
-        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
         var mode22Hits = 0
-        for (did in probes) {
-            val raw = connection.sendCommand(ObdCommands.mode22(did))
-            val data = StnParser.parseMode22(raw, did) ?: continue
-            if (data.isEmpty()) continue
-            mode22Hits++
-            rows += buildRow(mode = 0x22, id = did, header = ECU_HEADER, data = data)
+        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
+        try {
+            for (did in probes) {
+                val raw = connection.sendCommand(ObdCommands.mode22(did))
+                val data = StnParser.parseMode22(raw, did) ?: continue
+                if (data.isEmpty()) continue
+                mode22Hits++
+                rows += buildRow(mode = 0x22, id = did, header = ECU_HEADER, data = data)
+            }
+        } finally {
+            runCatching { connection.sendCommand("ATSH7DF") }
         }
-        connection.sendCommand("ATSH7DF")
         Log.i(TAG, "Mode 22 hits: $mode22Hits / ${probes.size}")
 
         return rows

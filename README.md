@@ -70,6 +70,8 @@ Google only launches **Car App Library** apps that were installed from a *truste
 3. Enable Android Auto developer mode (About → tap Version 10×) if you need DHU / extra options.
 4. Connect AA and open **WRX Race HUD** from the launcher.
 
+Play Console prep (foreground-service declarations, location, Car App category): see [docs/PLAY_CONSOLE.md](docs/PLAY_CONSOLE.md).
+
 **Desktop Head Unit (DHU)** can run the adb debug build for UI testing without Play.
 
 ## Vehicle notes

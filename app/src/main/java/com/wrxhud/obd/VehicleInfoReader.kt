@@ -1,6 +1,7 @@
 package com.wrxhud.obd
 
 import android.util.Log
+import com.wrxhud.BuildConfig
 import com.wrxhud.vehicle.VehicleInfo
 import com.wrxhud.vehicle.WrxProfile
 
@@ -56,10 +57,13 @@ object VehicleInfoReader {
             pid = 0x0A
         )
 
-        Log.i(
-            TAG,
-            "Vehicle info: vin=${vin ?: "n/a"} ($vinSource) cal=${calId ?: "n/a"} ecu=${ecuName ?: "n/a"}"
-        )
+        // VIN / CALID are identifying: debug builds only.
+        if (BuildConfig.DEBUG) {
+            Log.i(
+                TAG,
+                "Vehicle info: vin=${vin ?: "n/a"} ($vinSource) cal=${calId ?: "n/a"} ecu=${ecuName ?: "n/a"}"
+            )
+        }
 
         return VehicleInfo(
             vin = vin,

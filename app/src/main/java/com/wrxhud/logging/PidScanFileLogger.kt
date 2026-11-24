@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
+import com.wrxhud.BuildConfig
 import com.wrxhud.obd.PidScanLogEntry
 import com.wrxhud.obd.PidScanRow
 import java.text.SimpleDateFormat
@@ -60,12 +61,15 @@ object PidScanFileLogger {
                 out.write(body.toByteArray(Charsets.UTF_8))
             } ?: return null
             Log.i(TAG, "PID scan log → Download/$fileName (${entries.size} rows)")
-            entries.forEach { e ->
-                Log.i(
-                    TAG,
-                    "PID ${e.addressLabel()} raw=${e.rawHex} " +
-                        e.candidates.joinToString { "${it.decode.name}=${it.display}" }
-                )
+            // Raw ECU replies: debug builds only.
+            if (BuildConfig.DEBUG) {
+                entries.forEach { e ->
+                    Log.i(
+                        TAG,
+                        "PID ${e.addressLabel()} raw=${e.rawHex} " +
+                            e.candidates.joinToString { "${it.decode.name}=${it.display}" }
+                    )
+                }
             }
             fileName
         } catch (t: Throwable) {

@@ -227,8 +227,32 @@ class ObdPoller(
         )
     }
 
+    /**
+     * Runs [block] with the adapter header switched to [header] and always restores the
+     * functional-broadcast header (7DF) afterwards, even when [block] throws.
+     */
+    private inline fun <T> withEcuHeader(header: Int, block: () -> T): T {
+        connection.sendCommand(ObdCommands.setHeader(header))
+        try {
+            return block()
+        } finally {
+            restoreBroadcastHeader()
+        }
+    }
+
+    /** Best effort: a failure here must not mask the exception that got us here. */
+    private fun restoreBroadcastHeader() {
+        try {
+            connection.sendCommand("ATSH7DF")
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            Log.w(TAG, "Could not restore header 7DF", t)
+        }
+    }
+
     private fun assignment(signal: MappableSignal): PidAssignment? =
-        assignmentsProvider().firstOrNull { it.signal == signal }
+        assignmentsProvider().firstOrNull { it.signal == signal && it.isValid }
 
     /** SAE 01 0F when supported; else first plausible Mode 22 IAT candidate (read-only). */
     private fun discoverIat() {
@@ -246,7 +270,7 @@ class ObdPoller(
                 return
             }
         }
-        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
+        withEcuHeader(ECU_HEADER) {
         for (candidate in WrxProfile.iatCandidates) {
             val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
             val data = StnParser.parseMode22(raw, candidate.did) ?: continue
@@ -257,7 +281,7 @@ class ObdPoller(
             Log.i(TAG, "IAT confirmed via 22 ${"%04X".format(candidate.did)} = $value C")
             break
         }
-        connection.sendCommand("ATSH7DF")
+        }
         if (iatMode22Did == null && !useMode01Iat) {
             Log.w(TAG, "IAT: no Mode 01/22 source confirmed yet — check PID Log after a deep scan")
         }
@@ -304,7 +328,7 @@ class ObdPoller(
             }
         }
 
-        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
+        withEcuHeader(ECU_HEADER) {
         for (candidate in WrxProfile.mapCandidates) {
             val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
             val data = StnParser.parseMode22(raw, candidate.did) ?: continue
@@ -316,7 +340,7 @@ class ObdPoller(
             Log.i(TAG, "MAP confirmed via 22 ${"%04X".format(candidate.did)} = $value kPa")
             break
         }
-        connection.sendCommand("ATSH7DF")
+        }
         if (mapMode22Did == null && !useMode01Map) {
             Log.w(TAG, "MAP/boost: no Mode 01/22 source confirmed yet — check PID Log after a deep scan")
         }
@@ -327,7 +351,7 @@ class ObdPoller(
         val assignments = assignmentsProvider()
 
         fun addAssigned(signal: MappableSignal, name: String, apply: (Float) -> Unit) {
-            val a = assignments.firstOrNull { it.signal == signal } ?: return
+            val a = assignments.firstOrNull { it.signal == signal && it.isValid } ?: return
             list += SlowPid(name) { pollAssigned(a, apply) }
         }
 
@@ -514,9 +538,9 @@ class ObdPoller(
             }
             0x22 -> {
                 val header = assignment.header ?: ECU_HEADER
-                connection.sendCommand(ObdCommands.setHeader(header))
-                val raw = connection.sendCommand(ObdCommands.mode22(assignment.id))
-                connection.sendCommand("ATSH7DF")
+                val raw = withEcuHeader(header) {
+                    connection.sendCommand(ObdCommands.mode22(assignment.id))
+                }
                 StnParser.parseMode22(raw, assignment.id)
             }
             else -> null
@@ -552,9 +576,7 @@ class ObdPoller(
     }
 
     private fun pollMode22(did: Int, onData: (ByteArray) -> Unit) {
-        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
-        val raw = connection.sendCommand(ObdCommands.mode22(did))
-        connection.sendCommand("ATSH7DF")
+        val raw = withEcuHeader(ECU_HEADER) { connection.sendCommand(ObdCommands.mode22(did)) }
         val data = StnParser.parseMode22(raw, did) ?: return
         onData(data)
     }
@@ -783,14 +805,17 @@ class ObdPoller(
         val plan = planner.nextCycle(clockMs())
         for (request in plan.mode01) execMode01(request)
         if (plan.mode22.isNotEmpty()) {
-            for (group in plan.mode22) {
-                connection.sendCommand(ObdCommands.setHeader(group.header))
-                for (item in group.items) {
-                    val raw = connection.sendCommand(ObdCommands.mode22(item.pid))
-                    StnParser.parseMode22(raw, item.pid)?.let(item.onData)
+            try {
+                for (group in plan.mode22) {
+                    connection.sendCommand(ObdCommands.setHeader(group.header))
+                    for (item in group.items) {
+                        val raw = connection.sendCommand(ObdCommands.mode22(item.pid))
+                        StnParser.parseMode22(raw, item.pid)?.let(item.onData)
+                    }
                 }
+            } finally {
+                restoreBroadcastHeader()
             }
-            connection.sendCommand("ATSH7DF")
         }
     }
 

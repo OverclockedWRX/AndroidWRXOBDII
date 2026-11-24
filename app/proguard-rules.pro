@@ -19,3 +19,9 @@
 
 # Keep line numbers for readable crash reports.
 -keepattributes SourceFile,LineNumberTable
+
+# Release: strip verbose/debug logging (ObdConnection logs every command/reply preview at debug).
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+}
