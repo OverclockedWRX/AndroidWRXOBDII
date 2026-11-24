@@ -42,6 +42,16 @@ android {
     testOptions {
         // android.util.Log in poller code must not throw under plain JVM unit tests.
         unitTests.isReturnDefaultValues = true
+        // Robolectric needs merged resources/manifest for the Compose screenshot tests.
+        unitTests.isIncludeAndroidResources = true
+        unitTests.all {
+            it.systemProperty("wrx.shots", providers.gradleProperty("wrxShots").getOrElse("verify"))
+            it.systemProperty("wrx.shots.dir", file("src/test/screenshots").absolutePath)
+            it.systemProperty("wrx.shots.report", layout.buildDirectory.file("screenshot-report.txt").get().asFile.absolutePath)
+            it.maxHeapSize = "2g"
+            // Robolectric SDK 35 needs a Java 21 runtime; compilation stays on 17.
+            it.javaLauncher.set(javaToolchains.launcherFor { languageVersion.set(JavaLanguageVersion.of(21)) })
+        }
     }
 
     packaging {
@@ -88,4 +98,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.truth)
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.androidx.compose.bom))
+    testImplementation(libs.androidx.compose.ui.test.junit4)
 }
