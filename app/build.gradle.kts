@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.baselineprofile)
 }
 
 android {
@@ -13,8 +14,8 @@ android {
         applicationId = "com.wrxhud"
         minSdk = 35
         targetSdk = 36
-        versionCode = 36
-        versionName = "0.35.1-dev"
+        versionCode = 37
+        versionName = "0.36.0-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -61,6 +62,12 @@ android {
     }
 }
 
+baselineProfile {
+    // The profile shipped today is hand-written (src/main/baseline-prof.txt); the :baselineprofile
+    // generator needs an emulator/device, so it never runs as part of a normal build.
+    automaticGenerationDuringBuild = false
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
@@ -84,6 +91,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.profileinstaller)
+    "baselineProfile"(project(":baselineprofile"))
 
     // Android Auto (template instrument HUD)
     implementation(libs.androidx.car.app)
