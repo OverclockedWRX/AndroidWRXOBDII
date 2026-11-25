@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wrxhud.settings.MotionSetting
 import com.wrxhud.vehicle.UnitConverters
 import kotlin.math.abs
 import kotlinx.coroutines.launch
@@ -60,9 +61,18 @@ fun GearIndicator(
     val density = LocalDensity.current
     val perspectivePx = with(density) { 16.dp.toPx() }
 
-    LaunchedEffect(gear) {
+    val motion = currentHudMotion()
+    LaunchedEffect(gear, motion) {
         val next = UnitConverters.formatGear(gear)
         if (next == displayed) {
+            previousGear = gear
+            return@LaunchedEffect
+        }
+
+        if (motion != MotionSetting.FULL) {
+            flip.snapTo(0f)
+            flash.snapTo(0f)
+            displayed = next
             previousGear = gear
             return@LaunchedEffect
         }

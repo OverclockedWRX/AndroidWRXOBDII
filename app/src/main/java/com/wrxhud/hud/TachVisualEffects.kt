@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.unit.Density
@@ -305,7 +306,12 @@ internal class RaceSegTachRenderer(
     private val segW = ((w - gap * (segCount - 1)) / segCount).coerceAtLeast(2f)
     private val corner = CornerRadius(1.5f, 1.5f)
     private val trackCorner = CornerRadius(4f, 4f)
-    private val offFace = Color(0xFF2A2E34).copy(alpha = 0.85f)
+    // Unlit segments: dark plate on dark themes, pale on light ones so lit segments stand out.
+    private val offFace = if (p.trackColor.luminance() > 0.5f) {
+        Color.White.copy(alpha = 0.85f)
+    } else {
+        Color(0xFF2A2E34).copy(alpha = 0.85f)
+    }
     private val dimRed = p.red.copy(alpha = 0.35f)
     private val tipGlow = Color.White.copy(alpha = 0.45f)
     private val redlineX = (redline / maxRpm).coerceIn(0f, 1f) * w

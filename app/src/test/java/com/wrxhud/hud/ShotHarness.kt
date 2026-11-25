@@ -148,19 +148,16 @@ object ShotHarness {
         content: @Composable () -> Unit,
         beforeCapture: (ComposeContentTestRule) -> Unit = {}
     ) {
-        HudThemeController.colorTheme = theme
-        try {
-            rule.mainClock.autoAdvance = false
-            rule.setContent {
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            HudTheme(theme) {
                 Box(Modifier.testTag("shot").size(width, height).background(HudColors.Background)) { content() }
             }
-            rule.mainClock.advanceTimeBy(advanceMs)
-            beforeCapture(rule)
-            val img = capture(rule)
-            val failure = check(name, img)
-            if (failure != null) throw AssertionError(failure)
-        } finally {
-            HudThemeController.colorTheme = HudColorTheme.CLASSIC
         }
+        rule.mainClock.advanceTimeBy(advanceMs)
+        beforeCapture(rule)
+        val img = capture(rule)
+        val failure = check(name, img)
+        if (failure != null) throw AssertionError(failure)
     }
 }

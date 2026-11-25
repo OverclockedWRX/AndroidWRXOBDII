@@ -100,6 +100,7 @@ fun WarningLamps(
     }
 }
 
+@Composable
 private fun lampColors(tone: LampTone): Pair<Color, Color> = when (tone) {
     LampTone.GOOD -> HudColors.Green to HudColors.Background
     LampTone.IDLE -> HudColors.LampOff to HudColors.TextDim

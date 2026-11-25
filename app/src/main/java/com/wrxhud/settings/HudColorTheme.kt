@@ -4,28 +4,34 @@ package com.wrxhud.settings
  * Global HUD color palette. Independent of tach/shift visual style.
  */
 enum class HudColorTheme {
-    CLASSIC,
-    PINKY,
+    DARK,
+    LIGHT,
+    CONTRAST,
+    OLED,
+    CLAUDE,
+    HANDHELD,
     NIGHT,
-    EINK,
     /** Phosphor green + amber LCD / VFD look. */
     RETRO_LCD;
 
     val label: String
         get() = when (this) {
-            CLASSIC -> "Classic"
-            PINKY -> "Pinky"
+            DARK -> "Dark / Modern"
+            LIGHT -> "Light"
+            CONTRAST -> "High contrast"
+            OLED -> "OLED Black"
+            CLAUDE -> "Claude"
+            HANDHELD -> "Handheld"
             NIGHT -> "Night"
-            EINK -> "E-ink day"
             RETRO_LCD -> "Retro LCD"
         }
 
     companion object {
-        fun fromStored(raw: String?, pinkyFallback: Boolean): HudColorTheme {
-            if (raw != null) {
-                runCatching { valueOf(raw) }.getOrNull()?.let { return it }
-            }
-            return if (pinkyFallback) PINKY else CLASSIC
+        /** Reads a stored key, including the pre-0.37 names (CLASSIC, EINK, PINKY). */
+        fun fromStored(raw: String?): HudColorTheme = when (raw) {
+            "EINK" -> LIGHT
+            // CLASSIC, PINKY (also the old pinky_mode flag alone), unknown and unset.
+            else -> entries.firstOrNull { it.name == raw } ?: DARK
         }
     }
 }

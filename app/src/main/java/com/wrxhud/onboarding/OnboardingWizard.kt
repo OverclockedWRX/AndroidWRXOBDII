@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wrxhud.gps.GpsSourceMode
 import com.wrxhud.hud.HudColors
-import com.wrxhud.hud.HudThemeController
 import com.wrxhud.obd.PidScanRow
 import com.wrxhud.settings.HudColorTheme
 import com.wrxhud.settings.HudPreferences
@@ -278,28 +277,15 @@ private fun AppearancePage(
 ) {
     PageTitle("Appearance")
     PageSubtitle("Color theme")
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        HudColorTheme.entries.take(3).forEach { theme ->
-            FilterChip(
-                selected = preferences.colorTheme == theme,
-                onClick = {
-                    HudThemeController.colorTheme = theme
-                    onUpdate { it.copy(colorTheme = theme, pinkyMode = theme == HudColorTheme.PINKY) }
-                },
-                label = { Text(theme.label, fontFamily = FontFamily.Monospace) }
-            )
-        }
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        HudColorTheme.entries.drop(3).forEach { theme ->
-            FilterChip(
-                selected = preferences.colorTheme == theme,
-                onClick = {
-                    HudThemeController.colorTheme = theme
-                    onUpdate { it.copy(colorTheme = theme, pinkyMode = theme == HudColorTheme.PINKY) }
-                },
-                label = { Text(theme.label, fontFamily = FontFamily.Monospace) }
-            )
+    HudColorTheme.entries.chunked(3).forEach { row ->
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            row.forEach { theme ->
+                FilterChip(
+                    selected = preferences.colorTheme == theme,
+                    onClick = { onUpdate { it.copy(colorTheme = theme) } },
+                    label = { Text(theme.label, fontFamily = FontFamily.Monospace) }
+                )
+            }
         }
     }
 

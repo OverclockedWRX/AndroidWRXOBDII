@@ -42,7 +42,7 @@ class ShiftLightsScreenshotTest(
                 add(arrayOf(t, s, ShiftLightPattern.LEFT_TO_RIGHT, r))
             }
             for (s in TachVisualStyle.entries) for (p in ShiftLightPattern.entries.drop(1)) {
-                add(arrayOf(HudColorTheme.CLASSIC, s, p, 5600f))
+                add(arrayOf(HudColorTheme.DARK, s, p, 5600f))
             }
         }
     }
@@ -132,7 +132,9 @@ class GearFlipScreenshotTest(
         fun params(): List<Array<Any>> = buildList {
             for (t in HudColorTheme.entries) {
                 for ((capture, golden) in listOf(64L to 64L, 140L to 160L, 160L to 160L, 200L to 200L)) {
-                    add(arrayOf(t, capture, golden))
+                    // Themes added after the refactor have no pre-refactor frame to borrow.
+                    val legacy = t == HudColorTheme.NIGHT || t == HudColorTheme.RETRO_LCD
+                    add(arrayOf(t, capture, if (legacy) golden else capture))
                 }
             }
         }

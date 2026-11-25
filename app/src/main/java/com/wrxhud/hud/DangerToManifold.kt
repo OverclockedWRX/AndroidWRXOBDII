@@ -21,6 +21,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import com.wrxhud.R
+import com.wrxhud.settings.MotionSetting
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 
@@ -86,12 +87,14 @@ fun DangerToManifoldHost(
         showOverlay = false
     }
 
-    val flashOn by produceState(initialValue = true, showOverlay) {
-        if (!showOverlay) {
+    // No strobe unless motion is Full: the graphic is then shown steadily.
+    val strobe = showOverlay && currentHudMotion() == MotionSetting.FULL
+    val flashOn by produceState(initialValue = true, strobe) {
+        if (!strobe) {
             value = true
             return@produceState
         }
-        while (isActive && showOverlay) {
+        while (isActive) {
             value = true
             delay(FLASH_HALF_PERIOD_MS)
             value = false

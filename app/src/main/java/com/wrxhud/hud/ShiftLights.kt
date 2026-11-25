@@ -19,6 +19,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import com.wrxhud.settings.ShiftLightPattern
+import com.wrxhud.settings.MotionSetting
 import com.wrxhud.settings.TachVisualStyle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -47,15 +48,16 @@ fun ShiftLights(
     modifier: Modifier = Modifier
 ) {
     // Keyed on the over-redline flag, not on rpm: the flash cadence is 80 ms regardless of how
-    // often samples arrive. The flash loop only runs while the host is RESUMED; with system
-    // animations off the lamps stay solid instead of flashing.
+    // often samples arrive. The flash loop only runs while the host is RESUMED; unless motion
+    // is Full the lamps stay solid instead of flashing.
     val overRedline = rpm != null && rpm >= redline
     val owner = LocalLifecycleOwner.current
     val context = LocalContext.current
-    val flashOn by produceState(initialValue = true, overRedline, owner) {
+    val motion = LocalHudMotion.current
+    val flashOn by produceState(initialValue = true, overRedline, owner, motion) {
         if (overRedline) {
             owner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-                if (!animatorsEnabled(context)) {
+                if (resolveMotion(motion, context) != MotionSetting.FULL) {
                     value = true
                     return@repeatOnLifecycle
                 }
@@ -222,6 +224,7 @@ fun sampleThresholds(thresholds: List<Int>, stageCount: Int): List<Int> {
     }
 }
 
+@Composable
 fun shiftLightColor(stageIndex: Int, lit: Boolean, stageCount: Int = SHIFT_LIGHT_COUNT_LINEAR): Color {
     if (!lit) return HudColors.LampOff
     val last = (stageCount - 1).coerceAtLeast(1)

@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.wrxhud.gps.SpeedLimitReading
 import com.wrxhud.sensors.MotionReading
 import com.wrxhud.settings.MotionDisplayMode
+import com.wrxhud.settings.MotionSetting
 import com.wrxhud.settings.TachVisualStyle
 import com.wrxhud.vehicle.UnitConverters
 import kotlin.math.min
@@ -85,8 +86,14 @@ fun Tachometer(
     // composables, so the 60 fps interpolation never recomposes this function.
     val displayRpm = remember { mutableFloatStateOf(rpm ?: 0f) }
 
-    LaunchedEffect(rpm, previousRpm, sampleAgeMs) {
+    val snap = currentHudMotion() == MotionSetting.OFF
+
+    LaunchedEffect(rpm, previousRpm, sampleAgeMs, snap) {
         val target = rpm ?: return@LaunchedEffect
+        if (snap) {
+            displayRpm.floatValue = target
+            return@LaunchedEffect
+        }
         val from = previousRpm ?: target
         val spanNs = (sampleAgeMs.coerceIn(20L, 120L) * 1_000_000L)
         val startNs = withFrameNanos { it }
@@ -103,10 +110,14 @@ fun Tachometer(
 
     val displayThrottle = remember { mutableFloatStateOf(throttlePercent ?: 0f) }
     var previousThrottle by remember { mutableFloatStateOf(throttlePercent ?: 0f) }
-    LaunchedEffect(throttlePercent) {
+    LaunchedEffect(throttlePercent, snap) {
         val target = throttlePercent ?: return@LaunchedEffect
         val from = previousThrottle
         previousThrottle = target
+        if (snap) {
+            displayThrottle.floatValue = target
+            return@LaunchedEffect
+        }
         val spanNs = 80_000_000L
         val startNs = withFrameNanos { it }
         while (true) {

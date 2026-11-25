@@ -26,6 +26,8 @@ NOTE: Some things don't work. Feel free to fork the code and fix anything that's
 - Toggleable gauges: coolant, oil temp, oil pressure (user-mapped), IAT, boost/vacuum, AFR (λ×14.7), battery
 - PID scanner in Settings: discover Mode 01 / Mode 22 outputs and map them to gauges
 - Zone-colored tach bar (green → amber → red toward redline)
+- Eight color themes: Dark / Modern (default), Light, High contrast, OLED Black, Claude, Handheld, Night, Retro LCD
+- Motion setting: Full, Reduced or Off (follows the system animation setting until you pick one)
 - Warning lamps: CEL, low fuel, temps, overboost, battery, OBD/GPS link, knock/DAM (when Mode 22 DIDs are confirmed)
 - Simulator mode for UI development without a car
 - Settings stored in DataStore
