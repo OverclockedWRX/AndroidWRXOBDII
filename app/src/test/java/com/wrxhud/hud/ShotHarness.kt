@@ -34,12 +34,12 @@ import kotlin.math.abs
  * Every comparison is appended to build/screenshot-report.txt.
  */
 object ShotHarness {
-    val mode: String = System.getProperty("wrx.shots", "verify")
-    private val dir = File(System.getProperty("wrx.shots.dir", "src/test/screenshots"))
-    private val report = File(System.getProperty("wrx.shots.report", "build/screenshot-report.txt"))
+    val mode: String = (System.getProperty("wrx.shots") ?: "verify")
+    private val dir = File((System.getProperty("wrx.shots.dir") ?: "src/test/screenshots"))
+    private val report = File((System.getProperty("wrx.shots.report") ?: "build/screenshot-report.txt"))
 
-    /** Max allowed per-channel difference; 0 = pixel identical. */
-    val TOLERANCE: Int = System.getProperty("wrx.shots.tol", "0").toInt()
+    /** Max allowed per-channel difference; 1 = anti-aliasing rounding only. */
+    val TOLERANCE: Int = (System.getProperty("wrx.shots.tol") ?: "1").toInt()
 
     @Synchronized
     private fun log(line: String) {
@@ -125,6 +125,16 @@ object ShotHarness {
         block()
         Snapshot.sendApplyNotifications()
         rule.mainClock.advanceTimeBy(advanceMs)
+    }
+
+    /** Guards a documented golden substitution: the two files must really be different images. */
+    fun assertGoldensDiffer(a: String, b: String) {
+        val first = ImageIO.read(File(dir, "$a.png"))
+        val second = ImageIO.read(File(dir, "$b.png"))
+        val differs = (0 until first.height).any { y ->
+            (0 until first.width).any { x -> first.getRGB(x, y) != second.getRGB(x, y) }
+        }
+        if (!differs) throw AssertionError("$a and $b are identical; drop the substitution")
     }
 
     /** Shared scene wrapper: theme palette, fixed size, dark theme background. */

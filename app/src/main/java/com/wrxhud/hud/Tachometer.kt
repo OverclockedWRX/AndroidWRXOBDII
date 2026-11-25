@@ -1,6 +1,5 @@
 package com.wrxhud.hud
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,6 +19,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.unit.TextUnit
+import kotlin.math.roundToInt
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -77,7 +81,9 @@ fun Tachometer(
     val greenEnd = redline * 0.72f
     val amberStart = redline * 0.78f
     val redStart = redline * 0.92f
-    var displayRpm by remember { mutableFloatStateOf(rpm ?: 0f) }
+    // Animated values live in State objects that are read only in draw lambdas / tiny readout
+    // composables, so the 60 fps interpolation never recomposes this function.
+    val displayRpm = remember { mutableFloatStateOf(rpm ?: 0f) }
 
     LaunchedEffect(rpm, previousRpm, sampleAgeMs) {
         val target = rpm ?: return@LaunchedEffect
@@ -87,15 +93,15 @@ fun Tachometer(
         while (true) {
             val now = withFrameNanos { it }
             val t = ((now - startNs).toFloat() / spanNs).coerceIn(0f, 1f)
-            displayRpm = from + (target - from) * t
+            displayRpm.floatValue = from + (target - from) * t
             if (t >= 1f) {
-                displayRpm = target
+                displayRpm.floatValue = target
                 break
             }
         }
     }
 
-    var displayThrottle by remember { mutableFloatStateOf(throttlePercent ?: 0f) }
+    val displayThrottle = remember { mutableFloatStateOf(throttlePercent ?: 0f) }
     var previousThrottle by remember { mutableFloatStateOf(throttlePercent ?: 0f) }
     LaunchedEffect(throttlePercent) {
         val target = throttlePercent ?: return@LaunchedEffect
@@ -106,28 +112,15 @@ fun Tachometer(
         while (true) {
             val now = withFrameNanos { it }
             val t = ((now - startNs).toFloat() / spanNs).coerceIn(0f, 1f)
-            displayThrottle = from + (target - from) * t
+            displayThrottle.floatValue = from + (target - from) * t
             if (t >= 1f) {
-                displayThrottle = target
+                displayThrottle.floatValue = target
                 break
             }
         }
     }
 
-    val rpmColor = when {
-        displayRpm >= redline -> HudColors.Red
-        displayRpm >= redStart -> HudColors.Amber
-        else -> HudColors.TextPrimary
-    }
-
-    val throttleColor = when {
-        throttlePercent == null -> HudColors.TextDim
-        displayThrottle >= 90f -> HudColors.Red
-        displayThrottle >= 70f -> HudColors.Amber
-        else -> HudColors.TextPrimary
-    }
-
-    // Capture theme colors for Canvas (draw scope is not a composition context).
+    // Capture theme colors for the draw lambdas (draw scope is not a composition context).
     val trackColor = HudColors.TachTrack
     val blue = HudColors.BoostBlue
     val green = HudColors.Green
@@ -139,19 +132,18 @@ fun Tachometer(
     val boostBlue = HudColors.BoostBlue
     val silver = HudColors.TachFill
 
-    var phase by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(visualStyle) {
-        if (visualStyle == TachVisualStyle.LIQUID || visualStyle == TachVisualStyle.HELIX) {
-            while (true) {
-                withFrameNanos { ns ->
-                    phase = ((ns % 4_000_000_000L).toFloat() / 4_000_000_000f)
-                }
-            }
-        }
+    val phase = rememberLoopPhase(
+        active = visualStyle == TachVisualStyle.LIQUID || visualStyle == TachVisualStyle.HELIX,
+        periodNs = 4_000_000_000L
+    )
+    val palette = remember(trackColor, blue, green, amber, red, accent, panel, border, boostBlue, silver) {
+        TachPalette(trackColor, blue, green, amber, red, accent, panel, border, boostBlue, silver)
     }
+    val boostState = rememberUpdatedState(boostPsi)
+    val maxBoostState = rememberUpdatedState(maxBoostPsi)
 
-    // Only the availability flag is read here; the ~60 Hz readings are read inside
-    // MotionClusterHost so just that small scope recomposes.
+    // Only the availability flag is read here; the ~60 Hz readings are passed on as a
+    // provider and read in small readout scopes and draw lambdas.
     val motionAvailable by remember(motion) { derivedStateOf { motion().available } }
     val showMotion = motionAvailable && motionVisibility.gForce
     val sideCluster = speedValue != null || speedLimit != null || showGear || showMotion
@@ -177,13 +169,12 @@ fun Tachometer(
                 .weight(1f)
                 .fillMaxHeight()
         ) {
-            Text(
-                text = UnitConverters.formatRpm(if (rpm != null) displayRpm else null),
-                color = rpmColor,
-                fontSize = rpmValueSp,
-                fontWeight = FontWeight.Bold,
-                fontFamily = FontFamily.Monospace,
-                maxLines = 1
+            RpmReadout(
+                present = rpm != null,
+                displayRpm = displayRpm,
+                redline = redline,
+                redStart = redStart,
+                fontSize = rpmValueSp
             )
             Text(
                 text = "RPM",
@@ -200,110 +191,28 @@ fun Tachometer(
                     .fillMaxWidth()
                     .weight(1f)
             ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    val fraction = min(displayRpm / maxRpm, 1f)
-                    when (visualStyle) {
-                        TachVisualStyle.LIQUID -> drawTachLiquid(
-                            displayRpm = displayRpm,
-                            maxRpm = maxRpm,
-                            blueEnd = blueEnd,
-                            greenEnd = greenEnd,
-                            amberStart = amberStart,
-                            redStart = redStart,
-                            redline = redline.toFloat(),
-                            phase = phase,
-                            trackColor = trackColor,
-                            blue = blue,
-                            green = green,
-                            amber = amber,
-                            red = red,
-                            accent = accent
-                        )
-                        TachVisualStyle.HELIX -> {
-                            val boostFrac = ((boostPsi ?: 0f).coerceAtLeast(0f) / maxBoostPsi.coerceAtLeast(1f))
-                                .coerceIn(0f, 1f)
-                            drawTachHelix(
-                                rpmFraction = fraction,
-                                boostFraction = boostFrac,
-                                phase = phase * (2f * Math.PI.toFloat()),
-                                trackColor = trackColor,
-                                blue = blue,
-                                green = green,
-                                amber = amber,
-                                red = red,
-                                accent = accent,
-                                boostBlue = boostBlue
-                            )
-                        }
-                        TachVisualStyle.RACE_SEG -> drawTachRaceSegments(
-                            displayRpm = displayRpm,
-                            maxRpm = maxRpm,
-                            redline = redline.toFloat(),
-                            greenZoneStart = greenEnd,
-                            amberZoneStart = amberStart,
-                            redZoneStart = redStart,
-                            trackColor = trackColor,
-                            silver = silver,
-                            green = green,
-                            amber = amber,
-                            red = red,
-                            accent = accent
-                        )
-                        TachVisualStyle.BAR_3D -> {
-                            val depth = size.height * 0.28f
-                            val trackHeight = size.height * 0.52f
-                            val top = (size.height - trackHeight - depth) / 2f
-                            val trackWidth = size.width - depth
-                            val blueX = trackWidth * (blueEnd / maxRpm)
-                            val greenX = trackWidth * (greenEnd / maxRpm)
-                            val amberX = trackWidth * (amberStart / maxRpm)
-                            val redX = trackWidth * (redStart / maxRpm)
-                            val redlineX = trackWidth * (redline / maxRpm)
-                            val fillWidth = trackWidth * fraction
-                            val tachStops = arrayOf(
-                                0f to blue,
-                                (blueEnd / maxRpm) to blue,
-                                (greenEnd / maxRpm) to green,
-                                (amberStart / maxRpm) to green,
-                                (redStart / maxRpm) to amber,
-                                (redline / maxRpm) to red,
-                                1f to red
-                            )
-                            drawTach3dEnhanced(
-                                top = top,
-                                trackHeight = trackHeight,
-                                trackWidth = trackWidth,
-                                depth = depth,
-                                fillWidth = fillWidth,
-                                blueX = blueX,
-                                greenX = greenX,
-                                amberX = amberX,
-                                redX = redX,
-                                redlineX = redlineX,
-                                tachStops = tachStops,
-                                trackColor = trackColor,
-                                blue = blue,
-                                green = green,
-                                amber = amber,
-                                red = red,
-                                accent = accent,
-                                panel = panel,
-                                border = border
-                            )
-                        }
-                    }
-                }
+                RpmBar(
+                    style = visualStyle,
+                    palette = palette,
+                    redline = redline,
+                    maxRpm = maxRpm,
+                    blueEnd = blueEnd,
+                    greenEnd = greenEnd,
+                    amberStart = amberStart,
+                    redStart = redStart,
+                    displayRpm = displayRpm,
+                    phase = phase,
+                    boostPsi = boostState,
+                    maxBoostPsi = maxBoostState
+                )
             }
 
             if (showThrottle) {
                 Spacer(Modifier.height(2.dp))
-                Text(
-                    text = UnitConverters.formatPercent(throttlePercent?.let { displayThrottle }),
-                    color = throttleColor,
-                    fontSize = throttleValueSp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
-                    maxLines = 1
+                ThrottleReadout(
+                    present = throttlePercent != null,
+                    displayThrottle = displayThrottle,
+                    fontSize = throttleValueSp
                 )
                 Text(
                     text = "Throttle",
@@ -318,48 +227,7 @@ fun Tachometer(
                         .fillMaxWidth()
                         .weight(1f)
                 ) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val maxT = 100f
-                        val tBlue = 40f
-                        val tGreen = 65f
-                        val tAmber = 80f
-                        val tRed = 92f
-                        val fraction = min(displayThrottle / maxT, 1f)
-                        val depth = size.height * 0.28f
-                        val trackHeight = size.height * 0.52f
-                        val top = (size.height - trackHeight - depth) / 2f
-                        val trackWidth = size.width - depth
-                        val fillWidth = trackWidth * fraction
-                        val tachStops = arrayOf(
-                            0f to blue,
-                            (tBlue / maxT) to blue,
-                            (tGreen / maxT) to green,
-                            (tAmber / maxT) to green,
-                            (tRed / maxT) to amber,
-                            1f to red
-                        )
-                        drawTach3dEnhanced(
-                            top = top,
-                            trackHeight = trackHeight,
-                            trackWidth = trackWidth,
-                            depth = depth,
-                            fillWidth = fillWidth,
-                            blueX = trackWidth * (tBlue / maxT),
-                            greenX = trackWidth * (tGreen / maxT),
-                            amberX = trackWidth * (tAmber / maxT),
-                            redX = trackWidth * (tRed / maxT),
-                            redlineX = trackWidth,
-                            tachStops = tachStops,
-                            trackColor = trackColor,
-                            blue = blue,
-                            green = green,
-                            amber = amber,
-                            red = red,
-                            accent = accent,
-                            panel = panel,
-                            border = border
-                        )
-                    }
+                    ThrottleBar(palette = palette, displayThrottle = displayThrottle)
                 }
             }
         }
@@ -399,7 +267,7 @@ fun Tachometer(
                     }
                 }
                 if (showMotion) {
-                    MotionClusterHost(
+                    TachMotionCluster(
                         motion = motion,
                         mode = motionDisplayMode,
                         visibility = motionVisibility
@@ -448,11 +316,178 @@ fun DataLogRecordButton(
     }
 }
 
+/** RPM numeral: recomposes only when the displayed (rounded) value or its zone color changes. */
 @Composable
-private fun MotionClusterHost(
-    motion: () -> MotionReading,
-    mode: MotionDisplayMode,
-    visibility: MotionGaugeVisibility
+private fun RpmReadout(
+    present: Boolean,
+    displayRpm: State<Float>,
+    redline: Int,
+    redStart: Float,
+    fontSize: TextUnit
 ) {
-    TachMotionCluster(motion = motion(), mode = mode, visibility = visibility)
+    val rounded by remember(displayRpm) { derivedStateOf { displayRpm.value.roundToInt() } }
+    val zone by remember(displayRpm, redline, redStart) {
+        derivedStateOf {
+            val v = displayRpm.value
+            when {
+                v >= redline -> 2
+                v >= redStart -> 1
+                else -> 0
+            }
+        }
+    }
+    Text(
+        text = UnitConverters.formatRpm(if (present) rounded.toFloat() else null),
+        color = when (zone) {
+            2 -> HudColors.Red
+            1 -> HudColors.Amber
+            else -> HudColors.TextPrimary
+        },
+        fontSize = fontSize,
+        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Monospace,
+        maxLines = 1
+    )
+}
+
+/** Throttle numeral: same idea as [RpmReadout]. */
+@Composable
+private fun ThrottleReadout(
+    present: Boolean,
+    displayThrottle: State<Float>,
+    fontSize: TextUnit
+) {
+    val rounded by remember(displayThrottle) {
+        derivedStateOf { displayThrottle.value.coerceIn(0f, 100f).roundToInt() }
+    }
+    val zone by remember(displayThrottle) {
+        derivedStateOf {
+            val v = displayThrottle.value
+            when {
+                v >= 90f -> 2
+                v >= 70f -> 1
+                else -> 0
+            }
+        }
+    }
+    Text(
+        text = UnitConverters.formatPercent(if (present) rounded.toFloat() else null),
+        color = when {
+            !present -> HudColors.TextDim
+            zone == 2 -> HudColors.Red
+            zone == 1 -> HudColors.Amber
+            else -> HudColors.TextPrimary
+        },
+        fontSize = fontSize,
+        fontWeight = FontWeight.Bold,
+        fontFamily = FontFamily.Monospace,
+        maxLines = 1
+    )
+}
+
+/**
+ * RPM bar. All animated inputs ([displayRpm], [phase], boost) are read inside the draw
+ * lambda; the Brush/Path objects are rebuilt only when the size or the cache keys change.
+ */
+@Composable
+private fun RpmBar(
+    style: TachVisualStyle,
+    palette: TachPalette,
+    redline: Int,
+    maxRpm: Float,
+    blueEnd: Float,
+    greenEnd: Float,
+    amberStart: Float,
+    redStart: Float,
+    displayRpm: State<Float>,
+    phase: State<Float>,
+    boostPsi: State<Float?>,
+    maxBoostPsi: State<Float>
+) {
+    val drawModifier = remember(style, palette, redline, maxRpm) {
+        Modifier.drawWithCache {
+            val redlineF = redline.toFloat()
+            when (style) {
+                TachVisualStyle.LIQUID -> {
+                    val r = LiquidTachRenderer(this, size, palette, redlineF, maxRpm, blueEnd, greenEnd, amberStart, redStart)
+                    onDrawBehind { r.draw(this, displayRpm.value, phase.value) }
+                }
+                TachVisualStyle.HELIX -> onDrawBehind {
+                    val fraction = min(displayRpm.value / maxRpm, 1f)
+                    val boostFrac = ((boostPsi.value ?: 0f).coerceAtLeast(0f) / maxBoostPsi.value.coerceAtLeast(1f))
+                        .coerceIn(0f, 1f)
+                    drawTachHelix(
+                        rpmFraction = fraction,
+                        boostFraction = boostFrac,
+                        phase = phase.value * (2f * Math.PI.toFloat()),
+                        trackColor = palette.trackColor,
+                        blue = palette.blue,
+                        green = palette.green,
+                        amber = palette.amber,
+                        red = palette.red,
+                        accent = palette.accent,
+                        boostBlue = palette.boostBlue
+                    )
+                }
+                TachVisualStyle.RACE_SEG -> {
+                    val r = RaceSegTachRenderer(size, palette, redlineF, maxRpm, greenEnd, amberStart, redStart)
+                    onDrawBehind { r.draw(this, displayRpm.value) }
+                }
+                TachVisualStyle.BAR_3D -> {
+                    val stops = arrayOf(
+                        0f to palette.blue,
+                        (blueEnd / maxRpm) to palette.blue,
+                        (greenEnd / maxRpm) to palette.green,
+                        (amberStart / maxRpm) to palette.green,
+                        (redStart / maxRpm) to palette.amber,
+                        (redline / maxRpm) to palette.red,
+                        1f to palette.red
+                    )
+                    val r = Tach3dRenderer(
+                        size, palette,
+                        blueF = blueEnd / maxRpm,
+                        greenF = greenEnd / maxRpm,
+                        amberF = amberStart / maxRpm,
+                        redF = redStart / maxRpm,
+                        redlineF = redline / maxRpm,
+                        stops = stops
+                    )
+                    onDrawBehind { r.draw(this, min(displayRpm.value / maxRpm, 1f)) }
+                }
+            }
+        }
+    }
+    Spacer(Modifier.fillMaxSize().then(drawModifier))
+}
+
+@Composable
+private fun ThrottleBar(palette: TachPalette, displayThrottle: State<Float>) {
+    val drawModifier = remember(palette) {
+        Modifier.drawWithCache {
+            val maxT = 100f
+            val tBlue = 40f
+            val tGreen = 65f
+            val tAmber = 80f
+            val tRed = 92f
+            val stops = arrayOf(
+                0f to palette.blue,
+                (tBlue / maxT) to palette.blue,
+                (tGreen / maxT) to palette.green,
+                (tAmber / maxT) to palette.green,
+                (tRed / maxT) to palette.amber,
+                1f to palette.red
+            )
+            val r = Tach3dRenderer(
+                size, palette,
+                blueF = tBlue / maxT,
+                greenF = tGreen / maxT,
+                amberF = tAmber / maxT,
+                redF = tRed / maxT,
+                redlineF = 1f,
+                stops = stops
+            )
+            onDrawBehind { r.draw(this, min(displayThrottle.value / maxT, 1f)) }
+        }
+    }
+    Spacer(Modifier.fillMaxSize().then(drawModifier))
 }

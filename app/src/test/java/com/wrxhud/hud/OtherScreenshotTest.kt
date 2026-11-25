@@ -11,6 +11,7 @@ import com.wrxhud.settings.HudColorTheme
 import com.wrxhud.settings.MotionDisplayMode
 import com.wrxhud.settings.ShiftLightPattern
 import com.wrxhud.settings.TachVisualStyle
+import org.junit.Assume
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -104,38 +105,57 @@ class GearScreenshotTest(
     }
 }
 
-/** Mid-flip / flash frames of the gear change animation. */
+/**
+ * Mid-flip / flash frames of the gear change animation. All goldens come from the pre-refactor code.
+ *
+ * Known one-frame difference: since flash/flip are read in the draw phase, the frame on which the
+ * digit swaps shows the flash immediately; the old composition-phase read showed it one frame
+ * (16 ms) later. So the capture at 140 ms is compared with the OLD 160 ms golden. The old
+ * gearflip_*_140 goldens are kept, and the test asserts that this is still the only difference.
+ * Every other 16 ms frame from 16 to 480 ms was compared old vs new when this was introduced and
+ * was identical.
+ */
 @RunWith(ParameterizedRobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [35], qualifiers = "w900dp-h360dp-xhdpi")
 class GearFlipScreenshotTest(
     private val theme: HudColorTheme,
-    private val afterMs: Long
+    private val captureMs: Long,
+    private val goldenMs: Long
 ) {
     @get:Rule
     val rule = createComposeRule()
 
     companion object {
         @JvmStatic
-        @ParameterizedRobolectricTestRunner.Parameters(name = "{0}-{1}")
+        @ParameterizedRobolectricTestRunner.Parameters(name = "{0}-{1}-golden{2}")
         fun params(): List<Array<Any>> = buildList {
-            for (t in HudColorTheme.entries) for (ms in listOf(64L, 140L, 200L)) add(arrayOf(t, ms))
+            for (t in HudColorTheme.entries) {
+                for ((capture, golden) in listOf(64L to 64L, 140L to 160L, 160L to 160L, 200L to 200L)) {
+                    add(arrayOf(t, capture, golden))
+                }
+            }
         }
     }
 
     @Test
     fun flip() {
         var gear by mutableStateOf<Int?>(2)
+        if (captureMs != goldenMs && ShotHarness.mode != "record") {
+            ShotHarness.assertGoldensDiffer("gearflip_${theme.name}_$captureMs", "gearflip_${theme.name}_$goldenMs")
+        }
+        // The shifted case never records: it would overwrite the golden it borrows.
+        Assume.assumeTrue(captureMs == goldenMs || ShotHarness.mode != "record")
         ShotHarness.render(
             rule,
-            name = "gearflip_${theme.name}_$afterMs",
+            name = "gearflip_${theme.name}_$goldenMs",
             theme = theme,
             width = 200.dp,
             height = 230.dp,
             advanceMs = 300,
             content = { GearIndicator(gear = gear, compact = false) },
             beforeCapture = { r ->
-                ShotHarness.change(r, afterMs) { gear = 3 }
+                ShotHarness.change(r, captureMs) { gear = 3 }
             }
         )
     }

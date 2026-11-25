@@ -1,22 +1,23 @@
 package com.wrxhud.hud
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.repeatOnLifecycle
 import com.wrxhud.settings.ShiftLightPattern
 import com.wrxhud.settings.TachVisualStyle
 import kotlinx.coroutines.delay
@@ -45,11 +46,23 @@ fun ShiftLights(
     visualStyle: TachVisualStyle = TachVisualStyle.BAR_3D,
     modifier: Modifier = Modifier
 ) {
-    val flashOn by produceState(initialValue = true, rpm, redline) {
-        if (rpm != null && rpm >= redline) {
-            while (isActive) {
-                value = !value
-                delay(80)
+    // Keyed on the over-redline flag, not on rpm: the flash cadence is 80 ms regardless of how
+    // often samples arrive. The flash loop only runs while the host is RESUMED; with system
+    // animations off the lamps stay solid instead of flashing.
+    val overRedline = rpm != null && rpm >= redline
+    val owner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    val flashOn by produceState(initialValue = true, overRedline, owner) {
+        if (overRedline) {
+            owner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+                if (!animatorsEnabled(context)) {
+                    value = true
+                    return@repeatOnLifecycle
+                }
+                while (isActive) {
+                    value = !value
+                    delay(80)
+                }
             }
         } else {
             value = true
@@ -67,16 +80,10 @@ fun ShiftLights(
     val border = HudColors.Border
     val panel = HudColors.Panel
 
-    var phase by remember { mutableFloatStateOf(0f) }
-    LaunchedEffect(visualStyle) {
-        if (visualStyle == TachVisualStyle.LIQUID) {
-            while (true) {
-                withFrameNanos { ns ->
-                    phase = ((ns % 3_500_000_000L).toFloat() / 3_500_000_000f)
-                }
-            }
-        }
-    }
+    val phase = rememberLoopPhase(
+        active = visualStyle == TachVisualStyle.LIQUID,
+        periodNs = 3_500_000_000L
+    )
 
     val tall = visualStyle != TachVisualStyle.HELIX
     Row(
@@ -88,32 +95,38 @@ fun ShiftLights(
     ) {
         lampStates.forEach { lamp ->
             val face = shiftLightColor(lamp.stageIndex, lamp.lit, stageCount)
-            Canvas(
+            val stage = lamp.stageIndex
+            val lit = lamp.lit
+            val drawModifier = remember(visualStyle, lit, face, lampOff, border, panel, stage) {
+                Modifier.drawWithCache {
+                    when (visualStyle) {
+                        TachVisualStyle.LIQUID -> lampLiquid(
+                            lit = lit,
+                            faceColor = face,
+                            lampOff = lampOff,
+                            phase = { phase.floatValue + stage * 0.15f }
+                        )
+                        TachVisualStyle.RACE_SEG -> lampRaceSegment(
+                            lit = lit,
+                            faceColor = face,
+                            lampOff = lampOff
+                        )
+                        TachVisualStyle.BAR_3D, TachVisualStyle.HELIX -> lamp3dEnhanced(
+                            lit = lit,
+                            faceColor = face,
+                            lampOff = lampOff,
+                            border = border,
+                            panel = panel
+                        )
+                    }
+                }
+            }
+            Spacer(
                 modifier = Modifier
                     .weight(1f)
                     .height(if (tall) 20.dp else 16.dp)
-            ) {
-                when (visualStyle) {
-                    TachVisualStyle.LIQUID -> drawLampLiquid(
-                        lit = lamp.lit,
-                        faceColor = face,
-                        lampOff = lampOff,
-                        phase = phase + lamp.stageIndex * 0.15f
-                    )
-                    TachVisualStyle.RACE_SEG -> drawLampRaceSegment(
-                        lit = lamp.lit,
-                        faceColor = face,
-                        lampOff = lampOff
-                    )
-                    TachVisualStyle.BAR_3D, TachVisualStyle.HELIX -> drawLamp3dEnhanced(
-                        lit = lamp.lit,
-                        faceColor = face,
-                        lampOff = lampOff,
-                        border = border,
-                        panel = panel
-                    )
-                }
-            }
+                    .then(drawModifier)
+            )
         }
     }
 }

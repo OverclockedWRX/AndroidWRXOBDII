@@ -4,8 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutLinearInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
@@ -21,6 +19,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -80,8 +84,14 @@ fun GearIndicator(
         flip.animateTo(0f, tween(160, easing = LinearOutSlowInEasing))
     }
 
-    val borderColor = lerp(HudColors.Border, HudColors.Accent, flash.value)
-    val panelColor = lerp(HudColors.Panel, HudColors.Accent.copy(alpha = 0.22f), flash.value * 0.5f)
+    // Theme colors are read here (rare changes); the animated flip/flash values are only read
+    // inside draw / graphicsLayer lambdas so a gear change doesn't recompose per frame.
+    val baseBorder = HudColors.Border
+    val basePanel = HudColors.Panel
+    val accent = HudColors.Accent
+    val flashTint = remember(accent) { accent.copy(alpha = 0.22f) }
+    val flipProvider = remember(flip) { { flip.value } }
+    val flashProvider = remember(flash) { { flash.value } }
 
     val boxW = if (compact) 72.dp else TachSideClusterDims.width
     val boxH = if (compact) 80.dp else TachSideClusterDims.columnHeight
@@ -105,10 +115,12 @@ fun GearIndicator(
                 boxH = boxH,
                 gearSp = gearSp,
                 shape = shape,
-                panelColor = panelColor,
-                borderColor = borderColor,
-                flip = flip.value,
-                flash = flash.value,
+                basePanel = basePanel,
+                baseBorder = baseBorder,
+                accent = accent,
+                flashTint = flashTint,
+                flip = flipProvider,
+                flash = flashProvider,
                 perspectivePx = perspectivePx,
                 density = density
             )
@@ -121,10 +133,12 @@ fun GearIndicator(
             boxH = boxH,
             gearSp = gearSp,
             shape = shape,
-            panelColor = panelColor,
-            borderColor = borderColor,
-            flip = flip.value,
-            flash = flash.value,
+            basePanel = basePanel,
+            baseBorder = baseBorder,
+            accent = accent,
+            flashTint = flashTint,
+            flip = flipProvider,
+            flash = flashProvider,
             perspectivePx = perspectivePx,
             density = density,
             modifier = modifier
@@ -139,10 +153,12 @@ private fun GearFace(
     boxH: Dp,
     gearSp: TextUnit,
     shape: RoundedCornerShape,
-    panelColor: Color,
-    borderColor: Color,
-    flip: Float,
-    flash: Float,
+    basePanel: Color,
+    baseBorder: Color,
+    accent: Color,
+    flashTint: Color,
+    flip: () -> Float,
+    flash: () -> Float,
     perspectivePx: Float,
     density: Density,
     modifier: Modifier = Modifier
@@ -151,8 +167,27 @@ private fun GearFace(
         modifier = modifier
             .size(width = boxW, height = boxH)
             .clip(shape)
-            .background(panelColor, shape)
-            .border(2.dp, borderColor, shape),
+            .drawWithCache {
+                // Outline and stroke are cached; only the colors follow the flash animation.
+                val outline = shape.createOutline(size, layoutDirection, this)
+                // Same geometry as Modifier.border(2.dp, color, RoundedCornerShape(10.dp)).
+                val strokeW = 2.dp.toPx()
+                val half = strokeW / 2f
+                val stroke = Stroke(strokeW)
+                val strokeCorner = CornerRadius(10.dp.toPx() - half)
+                onDrawWithContent {
+                    val f = flash()
+                    drawOutline(outline, lerp(basePanel, flashTint, f * 0.5f))
+                    drawContent()
+                    drawRoundRect(
+                        color = lerp(baseBorder, accent, f),
+                        topLeft = Offset(half, half),
+                        size = Size(size.width - strokeW, size.height - strokeW),
+                        cornerRadius = strokeCorner,
+                        style = stroke
+                    )
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         Text(
@@ -162,11 +197,12 @@ private fun GearFace(
             fontWeight = FontWeight.Bold,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.graphicsLayer {
-                rotationX = flip
+                val flipAngle = flip()
+                rotationX = flipAngle
                 cameraDistance = perspectivePx * density.density
                 transformOrigin = TransformOrigin(0.5f, 0.5f)
-                alpha = 1f - (abs(flip) / 90f) * 0.55f
-                val scalePunch = 1f + (0.08f * flash)
+                alpha = 1f - (abs(flipAngle) / 90f) * 0.55f
+                val scalePunch = 1f + (0.08f * flash())
                 scaleX = scalePunch
                 scaleY = scalePunch
             }
