@@ -39,6 +39,10 @@ NOTE: Some things don't work. Feel free to fork the code and fix anything that's
 - Location permission for GPS speed
 - Bluetooth connect permission for the adapter
 
+## Privacy
+
+Speed-limit lookup is off by default. Only when you turn it on, the app sends your GPS coordinates over HTTPS to the OpenStreetMap Overpass servers (overpass-api.de and lz4.overpass-api.de) to find the posted limit.
+
 ## Build
 
 Open the project in Android Studio (Ladybug or newer) or:

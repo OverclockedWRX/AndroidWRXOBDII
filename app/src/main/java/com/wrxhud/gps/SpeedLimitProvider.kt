@@ -2,6 +2,7 @@ package com.wrxhud.gps
 
 import android.content.Context
 import android.util.Log
+import com.wrxhud.BuildConfig
 import com.wrxhud.settings.HudPreferences
 import com.wrxhud.vehicle.SpeedUnit
 import kotlinx.coroutines.CoroutineScope
@@ -58,15 +59,12 @@ class SpeedLimitProvider(
         private const val READ_TIMEOUT_MS = 15_000
         private const val FALLBACK_CONNECT_MS = 5_000
         private const val FALLBACK_READ_MS = 5_000
-        private const val USER_AGENT = "WRXRaceHUD/0.18 (private; OSM Overpass speed-limit)"
+        private val USER_AGENT = "WRXRaceHUD/${BuildConfig.VERSION_NAME} (OSM Overpass speed-limit)"
 
-        /** Fast mirrors first; private.coffee answered in ~0.5s in testing. */
+        /** Only the overpass-api.de servers receive coordinates. */
         private val OVERPASS_ENDPOINTS = listOf(
-            "https://overpass.private.coffee/api/interpreter",
             "https://lz4.overpass-api.de/api/interpreter",
-            "https://overpass-api.de/api/interpreter",
-            "https://overpass.osm.ch/api/interpreter",
-            "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+            "https://overpass-api.de/api/interpreter"
         )
     }
 

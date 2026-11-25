@@ -60,7 +60,7 @@ class BluetoothNmeaGps(
                 val sock = device.createRfcommSocketToServiceRecord(SPP_UUID)
                 sock.connect()
                 socket = sock
-                Log.i(TAG, "Connected to Bluetooth GPS: ${device.name}")
+                Log.d(TAG, "Connected to Bluetooth GPS: ${device.name}")
                 val reader = BufferedReader(InputStreamReader(sock.inputStream, Charsets.US_ASCII))
                 var speed: Float? = null
                 var hasFix = false

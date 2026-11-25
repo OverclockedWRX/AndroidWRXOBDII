@@ -14,8 +14,8 @@ android {
         applicationId = "com.wrxhud"
         minSdk = 35
         targetSdk = 36
-        versionCode = 38
-        versionName = "0.37.0-dev"
+        versionCode = 39
+        versionName = "0.37.1-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
