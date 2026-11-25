@@ -38,12 +38,40 @@ object ObdCommands {
     /** SAE Mode 01 — show current data (read). */
     fun mode01(pid: Int): String = "01%02X".format(pid)
 
+    /**
+     * Multi-PID Mode 01 request (up to 6 PIDs on CAN), e.g. `010C0D11`.
+     * [countHint] is the ELM327/STN response-count digit (`010C1`): the adapter returns
+     * after that many ECU replies instead of waiting out its timeout.
+     */
+    fun mode01Multi(pids: List<Int>, countHint: Int? = null): String {
+        require(pids.size in 1..MAX_MODE01_BATCH) { "1..$MAX_MODE01_BATCH PIDs per request" }
+        require(pids.all { it in 0..0xFF }) { "PID out of range 0..0xFF" }
+        require(countHint == null || countHint in 1..15) { "countHint must be 1..15" }
+        return buildString {
+            append("01")
+            pids.forEach { append("%02X".format(it)) }
+            if (countHint != null) append("%X".format(countHint))
+        }
+    }
+
+    /** Most PIDs one Mode 01 request may carry (SAE J1979). */
+    const val MAX_MODE01_BATCH = 6
+
     /** SAE Mode 09 — vehicle information (VIN, CALID, ECU name) — read. */
     fun mode09(pid: Int): String = "09%02X".format(pid)
 
     /** UDS ReadDataByIdentifier (service 0x22) — read. */
-    fun mode22(did: Int): String = "22%04X".format(did)
+    fun mode22(did: Int): String {
+        require(did in 0..MAX_DID) { "DID out of range 0..0xFFFF" }
+        return "22%04X".format(did)
+    }
+
+    const val MAX_DID = 0xFFFF
+    const val MAX_HEADER = 0xFFF
 
     /** Adapter header for the next request (does not write ECU memory). */
-    fun setHeader(header: Int): String = "ATSH%03X".format(header)
+    fun setHeader(header: Int): String {
+        require(header in 0..MAX_HEADER) { "Header out of range 0..0xFFF" }
+        return "ATSH%03X".format(header)
+    }
 }

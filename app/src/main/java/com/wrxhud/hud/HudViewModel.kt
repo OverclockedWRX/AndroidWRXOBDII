@@ -8,73 +8,66 @@ import android.content.ServiceConnection
 import android.os.IBinder
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.wrxhud.gps.GpsSpeedProvider
-import com.wrxhud.gps.SpeedLimitProvider
 import com.wrxhud.gps.SpeedLimitReading
-import com.wrxhud.logging.CsvDataLogger
 import com.wrxhud.obd.DtcReadResult
 import com.wrxhud.obd.ObdService
 import com.wrxhud.obd.PidScanRow
 import com.wrxhud.sensors.MotionMountCalibration
 import com.wrxhud.sensors.MotionReading
-import com.wrxhud.sensors.MotionSensorProvider
 import com.wrxhud.sensors.relativeTo
 import com.wrxhud.settings.HudPreferences
-import com.wrxhud.settings.SettingsRepository
-import com.wrxhud.telemetry.TelemetryHub
+import com.wrxhud.telemetry.TelemetryRepository
 import com.wrxhud.vehicle.VehicleInfo
 import com.wrxhud.vehicle.VehicleSnapshot
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-data class HudUiState(
-    val snapshot: VehicleSnapshot = VehicleSnapshot(),
-    val preferences: HudPreferences = HudPreferences(),
-    val connectionStatus: String = "Idle",
-    val motion: MotionReading = MotionReading(),
-    val speedLimit: SpeedLimitReading = SpeedLimitReading(),
-    val vehicleInfo: VehicleInfo = VehicleInfo(),
-    val runtimeStarted: Boolean = false,
-    val logging: Boolean = false,
-    val logFileName: String? = null
-)
-
+/**
+ * Thin UI-facing layer. Telemetry, preferences, GPS, speed limit and logging all live in
+ * [TelemetryRepository] (fed by the service); this exposes them as separate flows so each
+ * composable can collect only what it draws. No combine of everything at the root.
+ */
 class HudViewModel(application: Application) : AndroidViewModel(application) {
-    private val settingsRepository = SettingsRepository(application)
-    private val gps = GpsSpeedProvider(application)
-    private val motion = MotionSensorProvider(application)
-    private val speedLimitProvider = SpeedLimitProvider(viewModelScope, application)
-    private val dataLogger = CsvDataLogger(application)
+    private val repo = TelemetryRepository
 
-    private val _serviceSnapshot = MutableStateFlow(VehicleSnapshot())
-    private val _vehicleInfo = MutableStateFlow(VehicleInfo())
-    private val _status = MutableStateFlow("Idle")
-    private val _runtimeStarted = MutableStateFlow(false)
+    val preferences: StateFlow<HudPreferences> = repo.preferences
+    val snapshot: StateFlow<VehicleSnapshot> = repo.snapshot
+    val connectionStatus: StateFlow<String> = repo.status
+    val vehicleInfo: StateFlow<VehicleInfo> = repo.vehicleInfo
+    val speedLimit: StateFlow<SpeedLimitReading> = repo.speedLimit
+    val logging: StateFlow<Boolean> = repo.dataLog.recording
+    val logFileName: StateFlow<String?> = repo.dataLog.activeFileName
+
+    /** Rarely-changing gates for the root composable. */
+    val onboardingComplete: StateFlow<Boolean> = preferences
+        .map { it.onboardingComplete }.distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val motionCalibrated: StateFlow<Boolean> = preferences
+        .map { it.motionCalibrated }.distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+    /** Mount-calibrated motion for the HUD (collect only where it is drawn). */
+    val motion: StateFlow<MotionReading> = combine(repo.rawMotion, preferences) { raw, prefs ->
+        raw.relativeTo(calib = prefs.mountCalibration(), calibrated = prefs.motionCalibrated)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), MotionReading())
+
+    /** Raw (uncalibrated) motion; collect ONLY on the calibration screen. */
+    val rawMotion: StateFlow<MotionReading> = repo.rawMotion
+
     private var service: ObdService? = null
     private var bound = false
-    private var logJob: Job? = null
+    private var motionAcquired = false
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
             val local = binder as ObdService.LocalBinder
             service = local.getService()
             bound = true
-            viewModelScope.launch {
-                service?.snapshot?.collect { _serviceSnapshot.value = it }
-            }
-            viewModelScope.launch {
-                service?.status?.collect { _status.value = it }
-            }
-            viewModelScope.launch {
-                service?.vehicleInfo?.collect { _vehicleInfo.value = it }
-            }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
@@ -83,93 +76,11 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    val uiState: StateFlow<HudUiState> = combine(
-        combine(
-            _serviceSnapshot,
-            settingsRepository.preferencesFlow,
-            _status,
-            gps.reading,
-            _runtimeStarted
-        ) { snap, prefs, status, gpsReading, runtimeStarted ->
-            Triple(snap to prefs, status to gpsReading, runtimeStarted)
-        },
-        combine(motion.reading, speedLimitProvider.reading, dataLogger.recording, dataLogger.activeFileName) {
-                motionReading, speedLimit, logging, logName ->
-            Quad(motionReading, speedLimit, logging, logName)
-        },
-        _vehicleInfo
-    ) { core, logSide, vehicleInfo ->
-        val (snapPrefs, statusGps, runtimeStarted) = core
-        val (snap, prefs) = snapPrefs
-        val (status, gpsReading) = statusGps
-        val (motionReading, speedLimit, logging, logName) = logSide
-        val gpsSpeed = gpsReading.speedMps
-        val gpsFix = gpsReading.hasFix
-
-        val hasObdStream = when {
-            prefs.useSimulator -> snap.usingSimulator
-            else -> snap.obdConnected && !snap.usingSimulator
-        }
-
-        val displaySnap = if (hasObdStream) {
-            snap.copy(
-                gpsSpeedMps = gpsSpeed ?: snap.gpsSpeedMps,
-                gpsHasFix = gpsFix,
-                usingSimulator = prefs.useSimulator && snap.usingSimulator
-            )
-        } else {
-            snap.phoneOnly(
-                gpsSpeedMps = gpsSpeed,
-                gpsHasFix = gpsFix,
-                thresholds = prefs.toAlarmThresholds(),
-                expectObd = !prefs.useSimulator
-            )
-        }
-
-        val displayStatus = when {
-            prefs.useSimulator && snap.usingSimulator -> status
-            prefs.useSimulator -> "Starting simulator…"
-            snap.obdConnected -> status
-            status.isNotBlank() && status != "Stopped" && status != "Idle" -> status
-            else -> "No OBD — GPS only"
-        }
-
-        TelemetryHub.publishSnapshot(displaySnap)
-        TelemetryHub.publishPreferences(prefs)
-        TelemetryHub.publishStatus(displayStatus)
-
-        val calibratedMotion = motionReading.relativeTo(
-            calib = prefs.mountCalibration(),
-            calibrated = prefs.motionCalibrated
-        )
-
-        val displayVehicleInfo = vehicleInfo.copy(
-            oilTempSource = vehicleInfo.oilTempSource ?: displaySnap.oilTempSource
-        )
-
-        HudUiState(
-            snapshot = displaySnap,
-            preferences = prefs,
-            connectionStatus = displayStatus,
-            motion = calibratedMotion,
-            speedLimit = speedLimit,
-            vehicleInfo = displayVehicleInfo,
-            runtimeStarted = runtimeStarted,
-            logging = logging,
-            logFileName = logName
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HudUiState())
-
-    private data class Quad<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
-
     private var lastSimulatorSetting: Boolean? = null
-    private var lastGpsMode: com.wrxhud.gps.GpsSourceMode? = null
-    private var lastBluetoothGpsAddress: String? = null
 
     init {
-        speedLimitProvider.start(gps.reading, settingsRepository.preferencesFlow)
         viewModelScope.launch {
-            settingsRepository.preferencesFlow.collect { prefs ->
+            repo.preferences.collect { prefs ->
                 if (prefs.onboardingComplete) {
                     startRuntimeIfNeeded(prefs)
                 }
@@ -181,17 +92,6 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
         if (!preferences.onboardingComplete) return
         // Attitude sensors must run before mount calibration completes.
         ensureMotionStarted()
-        val gpsChanged = lastGpsMode != preferences.gpsSourceMode ||
-            lastBluetoothGpsAddress != preferences.bluetoothGpsAddress
-        if (!_runtimeStarted.value || gpsChanged) {
-            lastGpsMode = preferences.gpsSourceMode
-            lastBluetoothGpsAddress = preferences.bluetoothGpsAddress
-            gps.start(
-                mode = preferences.gpsSourceMode,
-                bluetoothAddress = preferences.bluetoothGpsAddress.ifBlank { null }
-            )
-            _runtimeStarted.value = true
-        }
         // Keep OBD/sim off during the required mount-calibration screen.
         if (!preferences.motionCalibrated) return
         if (lastSimulatorSetting != preferences.useSimulator) {
@@ -201,13 +101,13 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun ensureMotionStarted() {
-        motion.start()
+        if (!motionAcquired) {
+            motionAcquired = true
+            repo.acquireMotion()
+        }
     }
 
-    /** Raw (uncalibrated) reading for the mount test UI. */
-    val rawMotion: StateFlow<MotionReading> = motion.reading
-
-    fun rawMotionNow(): MotionReading = motion.reading.value
+    fun rawMotionNow(): MotionReading = repo.rawMotion.value
 
     fun saveMountCalibration(calib: MotionMountCalibration) {
         updatePreferences { prefs ->
@@ -244,7 +144,7 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             app.bindService(intent, connection, Context.BIND_AUTO_CREATE)
         }
         if (!useSimulator) {
-            _serviceSnapshot.value = VehicleSnapshot()
+            repo.publishObd(VehicleSnapshot())
         }
     }
 
@@ -265,12 +165,12 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
             action = ObdService.ACTION_STOP
         }
         app.startService(intent)
-        _serviceSnapshot.value = VehicleSnapshot()
+        repo.publishObd(VehicleSnapshot())
     }
 
     fun updatePreferences(transform: (HudPreferences) -> HudPreferences) {
         viewModelScope.launch {
-            settingsRepository.update(transform)
+            repo.settings.update(transform)
         }
     }
 
@@ -289,49 +189,20 @@ class HudViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun refreshVehicleInfo(): VehicleInfo {
-        val info = service?.refreshVehicleInfo() ?: _vehicleInfo.value
-        _vehicleInfo.value = info
+        val info = service?.refreshVehicleInfo() ?: repo.rawVehicleInfo.value
+        repo.publishVehicleInfo(info)
         return info
     }
 
     fun isLiveObdConnected(): Boolean = service?.isLiveConnected() == true
 
-    fun toggleDataLog() {
-        if (dataLogger.recording.value) {
-            stopDataLog()
-        } else {
-            startDataLog()
-        }
-    }
-
-    fun startDataLog() {
-        if (dataLogger.recording.value) return
-        val started = dataLogger.start() ?: return
-        logJob?.cancel()
-        logJob = viewModelScope.launch {
-            var ticks = 0
-            while (isActive && dataLogger.recording.value) {
-                val ui = uiState.value
-                dataLogger.append(ui.snapshot, ui.motion, ui.speedLimit)
-                ticks++
-                if (ticks % 10 == 0) dataLogger.flush()
-                delay(100L)
-            }
-        }
-        android.util.Log.i("HudViewModel", "Data log → Download/$started")
-    }
-
-    fun stopDataLog() {
-        logJob?.cancel()
-        logJob = null
-        dataLogger.stop()
-    }
+    fun toggleDataLog() = repo.dataLog.toggle()
 
     override fun onCleared() {
-        stopDataLog()
-        speedLimitProvider.stop()
-        gps.destroy()
-        motion.stop()
+        if (motionAcquired) {
+            motionAcquired = false
+            repo.releaseMotion()
+        }
         if (bound) {
             getApplication<Application>().unbindService(connection)
             bound = false

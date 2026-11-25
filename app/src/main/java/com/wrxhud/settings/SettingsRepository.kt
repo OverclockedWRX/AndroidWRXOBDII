@@ -39,12 +39,13 @@ class SettingsRepository(private val context: Context) {
         val tireAspect = intPreferencesKey("tire_aspect")
         val wheelIn = intPreferencesKey("wheel_in")
         val useSim = booleanPreferencesKey("use_sim")
-        val pinkyMode = booleanPreferencesKey("pinky_mode")
+        val pollingMode = stringPreferencesKey("polling_mode")
         val colorTheme = stringPreferencesKey("color_theme")
         val dangerToManifold = booleanPreferencesKey("danger_to_manifold")
         val rpmGauge3d = booleanPreferencesKey("rpm_gauge_3d")
         val tachVisualStyle = stringPreferencesKey("tach_visual_style")
         val motionDisplayMode = stringPreferencesKey("motion_display_mode")
+        val motionSetting = stringPreferencesKey("motion_setting")
         val showMotionPitch = booleanPreferencesKey("show_motion_pitch")
         val showMotionRoll = booleanPreferencesKey("show_motion_roll")
         val showMotionGForce = booleanPreferencesKey("show_motion_gforce")
@@ -93,12 +94,14 @@ class SettingsRepository(private val context: Context) {
             prefs[Keys.tireAspect] = next.tireAspect
             prefs[Keys.wheelIn] = next.wheelDiameterIn
             prefs[Keys.useSim] = next.useSimulator
-            prefs[Keys.pinkyMode] = next.colorTheme == HudColorTheme.PINKY
+            prefs[Keys.pollingMode] = next.pollingMode.name
             prefs[Keys.colorTheme] = next.colorTheme.name
             prefs[Keys.dangerToManifold] = next.dangerToManifold
             prefs[Keys.rpmGauge3d] = next.tachVisualStyle == TachVisualStyle.BAR_3D
             prefs[Keys.tachVisualStyle] = next.tachVisualStyle.name
             prefs[Keys.motionDisplayMode] = next.motionDisplayMode.name
+            next.motionSetting?.let { prefs[Keys.motionSetting] = it.name }
+                ?: prefs.remove(Keys.motionSetting)
             prefs[Keys.showMotionPitch] = next.showMotionPitch
             prefs[Keys.showMotionRoll] = next.showMotionRoll
             prefs[Keys.showMotionGForce] = next.showMotionGForce
@@ -164,11 +167,9 @@ class SettingsRepository(private val context: Context) {
             tireAspect = this[Keys.tireAspect] ?: defaults.tireAspect,
             wheelDiameterIn = this[Keys.wheelIn] ?: defaults.wheelDiameterIn,
             useSimulator = this[Keys.useSim] ?: defaults.useSimulator,
-            pinkyMode = this[Keys.pinkyMode] ?: defaults.pinkyMode,
-            colorTheme = HudColorTheme.fromStored(
-                this[Keys.colorTheme],
-                pinkyFallback = this[Keys.pinkyMode] ?: false
-            ),
+            pollingMode = PollingMode.fromStored(this[Keys.pollingMode]),
+            colorTheme = HudColorTheme.fromStored(this[Keys.colorTheme]),
+            motionSetting = MotionSetting.fromStored(this[Keys.motionSetting]),
             dangerToManifold = this[Keys.dangerToManifold] ?: defaults.dangerToManifold,
             rpmGauge3d = this[Keys.rpmGauge3d] ?: defaults.rpmGauge3d,
             tachVisualStyle = TachVisualStyle.fromStored(

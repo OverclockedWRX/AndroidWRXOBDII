@@ -36,7 +36,7 @@ fun HudScreen(
     snapshot: VehicleSnapshot,
     preferences: HudPreferences,
     connectionStatus: String,
-    motion: MotionReading = MotionReading(),
+    motion: () -> MotionReading = { MotionReading() },
     speedLimit: SpeedLimitReading = SpeedLimitReading(),
     logging: Boolean = false,
     logFileName: String? = null,

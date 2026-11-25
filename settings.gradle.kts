@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "WRXRaceHUD"
 include(":app")
+include(":baselineprofile")

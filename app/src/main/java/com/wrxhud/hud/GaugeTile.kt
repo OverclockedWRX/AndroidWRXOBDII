@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.wrxhud.settings.MotionSetting
 import com.wrxhud.vehicle.AlarmEvaluator
 import com.wrxhud.vehicle.PressureUnit
 import com.wrxhud.vehicle.UnitConverters
@@ -38,8 +39,10 @@ fun GaugeTile(
     severity: AlarmEvaluator.Severity,
     modifier: Modifier = Modifier
 ) {
-    val flashOn by produceState(initialValue = true, severity) {
-        if (severity == AlarmEvaluator.Severity.CRITICAL) {
+    val flashing = severity == AlarmEvaluator.Severity.CRITICAL &&
+        currentHudMotion() != MotionSetting.OFF
+    val flashOn by produceState(initialValue = true, flashing) {
+        if (flashing) {
             while (isActive) {
                 value = !value
                 delay(120)
@@ -111,8 +114,10 @@ fun BoostVacTile(
         inBoost -> "BST"
         else -> "VAC"
     }
-    val flashOn by produceState(initialValue = true, severity) {
-        if (severity == AlarmEvaluator.Severity.CRITICAL) {
+    val flashing = severity == AlarmEvaluator.Severity.CRITICAL &&
+        currentHudMotion() != MotionSetting.OFF
+    val flashOn by produceState(initialValue = true, flashing) {
+        if (flashing) {
             while (isActive) {
                 value = !value
                 delay(120)
@@ -274,6 +279,7 @@ fun SpeedTile(
     }
 }
 
+@Composable
 fun severityColor(severity: AlarmEvaluator.Severity): Color = when (severity) {
     AlarmEvaluator.Severity.CRITICAL -> HudColors.Red
     AlarmEvaluator.Severity.WARN -> HudColors.Amber

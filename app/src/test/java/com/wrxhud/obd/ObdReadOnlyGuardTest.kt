@@ -64,4 +64,36 @@ class ObdReadOnlyGuardTest {
             }
         }
     }
+
+    @Test
+    fun allowsReadOnlyMultiPidAndResponseCountForms() {
+        listOf(
+            "010C1", "010D1", "010C0D", "010C0D11", "010C0D111", "010C0D1149",
+            "010C0D11490B33", "010C0D11490B331", "01 0C 0D 11"
+        ).forEach { cmd ->
+            assertThat(ObdReadOnlyGuard.isAllowed(cmd.uppercase().replace(" ", ""))).isTrue()
+        }
+        assertThat(ObdCommands.mode01Multi(listOf(0x0C, 0x0D, 0x11), 1)).isEqualTo("010C0D111")
+        assertThat(ObdCommands.mode01Multi(listOf(0x0C))).isEqualTo("010C")
+        assertThat(ObdCommands.mode01Multi(listOf(0x0C), 1)).isEqualTo("010C1")
+        ObdReadOnlyGuard.assertAllowed(ObdCommands.mode01Multi(listOf(1, 2, 3, 4, 5, 6), 1))
+    }
+
+    @Test
+    fun stillBlocksWritesAndOverlongOrOddMode01Forms() {
+        listOf(
+            "010C0D11490B330C1", // 7 PIDs
+            "010C0",             // count digit 0 is not a valid hint
+            "01",                // no PID
+            "010",
+            "0C1",               // not mode 01
+            "2E010C1",           // write DID
+            "0101ZZ",
+            "010C1;ATZ",
+            "041",               // clear DTCs must stay exactly 04
+            "221234AA"
+        ).forEach { cmd ->
+            assertThat(ObdReadOnlyGuard.isAllowed(cmd)).isFalse()
+        }
+    }
 }

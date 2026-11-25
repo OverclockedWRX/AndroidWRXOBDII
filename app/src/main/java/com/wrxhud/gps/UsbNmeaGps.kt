@@ -3,6 +3,7 @@ package com.wrxhud.gps
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
+import androidx.core.content.ContextCompat
 import android.content.Intent
 import android.content.IntentFilter
 import android.hardware.usb.UsbDevice
@@ -74,7 +75,7 @@ class UsbNmeaGps(
             val pi = PendingIntent.getBroadcast(
                 context,
                 0,
-                Intent(ACTION_USB_PERMISSION),
+                Intent(ACTION_USB_PERMISSION).setPackage(context.packageName),
                 flags
             )
             usbManager.requestPermission(device, pi)
@@ -182,11 +183,12 @@ class UsbNmeaGps(
     private fun registerPermissionReceiver() {
         if (permissionReceiverRegistered) return
         val filter = IntentFilter(ACTION_USB_PERMISSION)
-        if (Build.VERSION.SDK_INT >= 33) {
-            context.registerReceiver(permissionReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        } else {
-            context.registerReceiver(permissionReceiver, filter)
-        }
+        ContextCompat.registerReceiver(
+            context,
+            permissionReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         permissionReceiverRegistered = true
     }
 

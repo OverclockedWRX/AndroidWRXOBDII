@@ -54,7 +54,7 @@ class DtcReader(private val connection: ObdConnection) {
         val raw = connection.sendCommand(ObdCommands.MODE_04_CLEAR_DTCS)
         val ok = !StnParser.isError(raw) &&
             (StnParser.normalize(raw).contains("44") || StnParser.normalize(raw).isNotEmpty())
-        Log.i(TAG, "Clear DTCs -> ok=$ok raw=${StnParser.normalize(raw)}")
+        Log.i(TAG, "Clear DTCs -> ok=$ok")
         return ok
     }
 

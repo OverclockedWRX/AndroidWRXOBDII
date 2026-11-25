@@ -1,0 +1,49 @@
+# HAND-WRITTEN baseline profile (no emulator/device was available to generate one).
+# Rules use ART profile wildcards (H = hot, S = startup, P = post-startup, L... = class preload).
+# When the :baselineprofile generator is run on a machine with an emulator
+# (sh ./gradlew :app:generateBaselineProfile), its output in src/main/generated/baselineProfiles
+# is merged with this file; refine or drop these rules then.
+
+# --- Process / activity startup -------------------------------------------------------
+HSPLcom/wrxhud/WrxHudApp;->**(**)**
+HSPLcom/wrxhud/MainActivity;->**(**)**
+HSPLcom/wrxhud/MainActivity**;->**(**)**
+Lcom/wrxhud/WrxHudApp;
+Lcom/wrxhud/MainActivity;
+
+# --- Settings (DataStore load on first frame) -----------------------------------------
+HSPLcom/wrxhud/settings/**;->**(**)**
+Lcom/wrxhud/settings/**;
+
+# --- HUD composables and draw code (60 fps hot path) ----------------------------------
+HSPLcom/wrxhud/hud/**;->**(**)**
+Lcom/wrxhud/hud/**;
+
+# --- Shared UI, onboarding gate, themes -----------------------------------------------
+HSPLcom/wrxhud/ui/**;->**(**)**
+HSPLcom/wrxhud/onboarding/**;->**(**)**
+Lcom/wrxhud/ui/**;
+
+# --- Telemetry flow, vehicle model, unit conversion -----------------------------------
+HSPLcom/wrxhud/telemetry/**;->**(**)**
+HSPLcom/wrxhud/vehicle/**;->**(**)**
+Lcom/wrxhud/telemetry/**;
+Lcom/wrxhud/vehicle/**;
+
+# --- OBD poller hot paths: planning, framing, parsing, stats, simulator ---------------
+HSPLcom/wrxhud/obd/ObdPoller**;->**(**)**
+HSPLcom/wrxhud/obd/PollPlanner**;->**(**)**
+HSPLcom/wrxhud/obd/PollStats**;->**(**)**
+HSPLcom/wrxhud/obd/FrameBuffer**;->**(**)**
+HSPLcom/wrxhud/obd/StnParser**;->**(**)**
+HSPLcom/wrxhud/obd/PidMapping**;->**(**)**
+HSPLcom/wrxhud/obd/ObdCommands**;->**(**)**
+HSPLcom/wrxhud/obd/SimulatedObdSource**;->**(**)**
+HSPLcom/wrxhud/obd/ObdService**;->**(**)**
+HSPLcom/wrxhud/obd/ReconnectLoop**;->**(**)**
+Lcom/wrxhud/obd/**;
+
+# --- Sensors / GPS providers started with the HUD -------------------------------------
+HSPLcom/wrxhud/sensors/**;->**(**)**
+HSPLcom/wrxhud/gps/GpsSpeedProvider**;->**(**)**
+HSPLcom/wrxhud/gps/NmeaParser**;->**(**)**

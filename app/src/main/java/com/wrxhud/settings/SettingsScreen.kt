@@ -43,14 +43,16 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.wrxhud.gps.GpsSourceMode
 import com.wrxhud.hud.HudColors
-import com.wrxhud.hud.HudThemeController
+import com.wrxhud.hud.currentHudMotion
 import com.wrxhud.vehicle.GaugeId
 import com.wrxhud.vehicle.LampId
 import com.wrxhud.vehicle.PressureUnit
 import com.wrxhud.vehicle.SpeedUnit
 import com.wrxhud.vehicle.TempUnit
+import com.wrxhud.telemetry.TelemetryRepository
 import com.wrxhud.vehicle.VehicleInfo
 import com.wrxhud.vehicle.WrxProfile
 import kotlinx.coroutines.launch
@@ -226,6 +228,26 @@ private fun SourceTab(
         )
     }
 
+    SectionTitle("Polling mode")
+    Text(
+        text = "Fast batches PIDs and uses the adapter response-count hint (more RPM samples per second). " +
+            "Legacy is the original one-PID-per-request stream; use it if a gauge misbehaves in Fast. " +
+            "Switches live, no reconnect needed.",
+        color = HudColors.TextDim,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace,
+        lineHeight = 15.sp
+    )
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        PollingMode.entries.forEach { mode ->
+            FilterChip(
+                selected = preferences.pollingMode == mode,
+                onClick = { onUpdate { it.copy(pollingMode = mode) } },
+                label = { Text(mode.label) }
+            )
+        }
+    }
+
     SectionTitle("GPS source")
     Text(
         text = "Auto uses built-in GNSS when present, and falls back to Bluetooth / USB NMEA dongles (pair BT GPS in Android settings first).",
@@ -309,6 +331,18 @@ private fun VehicleInfoTab(
             fontFamily = FontFamily.Monospace
         )
     }
+
+    SectionTitle("Poll rate")
+    val pollStats by TelemetryRepository.pollStats.collectAsStateWithLifecycle()
+    InfoRow("Mode", pollStats.mode?.label ?: "—")
+    InfoRow("RPM samples/s", if (pollStats.mode == null) "—" else "%.1f".format(pollStats.rpmPerSec))
+    InfoRow("Full cycles/s", if (pollStats.mode == null) "—" else "%.1f".format(pollStats.cyclesPerSec))
+    InfoRow("Requests/s", if (pollStats.mode == null) "—" else "%.1f".format(pollStats.requestsPerSec))
+    InfoRow(
+        "Latency avg / max",
+        if (pollStats.mode == null) "—"
+        else "%.0f / %.0f ms".format(pollStats.avgLatencyMs, pollStats.maxLatencyMs)
+    )
 
     SectionTitle("Adapter")
     InfoRow("Status", connectionStatus.ifBlank { "—" })
@@ -397,32 +431,19 @@ private fun LookTab(
         fontSize = 11.sp,
         fontFamily = FontFamily.Monospace
     )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        HudColorTheme.entries.take(3).forEach { theme ->
-            FilterChip(
-                selected = preferences.colorTheme == theme,
-                onClick = {
-                    HudThemeController.colorTheme = theme
-                    onUpdate { it.copy(colorTheme = theme, pinkyMode = theme == HudColorTheme.PINKY) }
-                },
-                label = { Text(theme.label, fontFamily = FontFamily.Monospace) }
-            )
-        }
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        HudColorTheme.entries.drop(3).forEach { theme ->
-            FilterChip(
-                selected = preferences.colorTheme == theme,
-                onClick = {
-                    HudThemeController.colorTheme = theme
-                    onUpdate { it.copy(colorTheme = theme, pinkyMode = theme == HudColorTheme.PINKY) }
-                },
-                label = { Text(theme.label, fontFamily = FontFamily.Monospace) }
-            )
+    HudColorTheme.entries.chunked(3).forEach { row ->
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            row.forEach { theme ->
+                FilterChip(
+                    selected = preferences.colorTheme == theme,
+                    onClick = { onUpdate { it.copy(colorTheme = theme) } },
+                    label = { Text(theme.label, fontFamily = FontFamily.Monospace) }
+                )
+            }
         }
     }
     Text(
-        "Night dims chromas; E-ink is cream/black daylight; Retro LCD is phosphor green + amber.",
+        "Light is for daylight; Night dims chromas; Retro LCD is phosphor green + amber.",
         color = HudColors.TextDim,
         fontSize = 11.sp,
         fontFamily = FontFamily.Monospace,
@@ -484,6 +505,31 @@ private fun LookTab(
             onCheckedChange = { checked -> onUpdate { it.copy(dangerToManifold = checked) } }
         )
     }
+
+    Text(
+        "Motion",
+        color = HudColors.TextDim,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace
+    )
+    val motion = currentHudMotion()
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MotionSetting.entries.forEach { setting ->
+            FilterChip(
+                selected = motion == setting,
+                onClick = { onUpdate { it.copy(motionSetting = setting) } },
+                label = { Text(setting.label, fontFamily = FontFamily.Monospace) }
+            )
+        }
+    }
+    Text(
+        "Reduced stops liquid/helix loops, the gear flip and shift/warning strobes. Off also stops " +
+            "bar smoothing and flashing alarms. Until you pick one it follows the system animation setting.",
+        color = HudColors.TextDim,
+        fontSize = 11.sp,
+        fontFamily = FontFamily.Monospace,
+        lineHeight = 15.sp
+    )
 
     SectionTitle("Attitude")
     Text(

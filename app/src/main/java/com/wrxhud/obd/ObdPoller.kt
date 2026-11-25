@@ -1,6 +1,7 @@
 package com.wrxhud.obd
 
 import android.util.Log
+import com.wrxhud.settings.PollingMode
 import com.wrxhud.vehicle.AlarmEvaluator
 import com.wrxhud.vehicle.GearCalculator
 import com.wrxhud.vehicle.UnitConverters
@@ -14,9 +15,10 @@ import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -25,12 +27,16 @@ import java.util.concurrent.atomic.AtomicBoolean
  * User [PidAssignment]s override auto-discovery for mapped signals.
  */
 class ObdPoller(
-    private val connection: ObdConnection,
+    connection: ObdLink,
     private val scope: CoroutineScope,
+    private val connectionLock: Mutex = Mutex(),
     private val gearConfigProvider: () -> GearConfig,
     private val gpsSpeedProvider: () -> Pair<Float?, Boolean>,
     private val thresholdsProvider: () -> WrxProfile.AlarmThresholds,
-    private val assignmentsProvider: () -> List<PidAssignment> = { emptyList() }
+    private val assignmentsProvider: () -> List<PidAssignment> = { emptyList() },
+    private val pollingModeProvider: () -> PollingMode = { PollingMode.FAST },
+    /** Scheduler clock (ms); injectable so tests can simulate adapter latency. */
+    private val clockMs: () -> Long = { System.currentTimeMillis() }
 ) {
     data class GearConfig(
         val transmission: WrxProfile.TransmissionProfile,
@@ -42,6 +48,27 @@ class ObdPoller(
         private val ECU_HEADER = 0x7E0
     }
 
+    /** Wraps the link to time every request (stats only; commands pass through unchanged). */
+    private val rawLink: ObdLink = connection
+    private val connection: ObdLink = object : ObdLink {
+        override val isOpen: Boolean get() = rawLink.isOpen
+        override fun sendCommand(command: String, waitForPrompt: Boolean, timeoutMs: Long): String {
+            val t0 = System.nanoTime()
+            try {
+                return rawLink.sendCommand(command, waitForPrompt, timeoutMs)
+            } finally {
+                meter.request(System.nanoTime() - t0)
+            }
+        }
+    }
+
+    private val meter = PollStatsMeter()
+    private val _pollStats = MutableStateFlow(PollStats())
+    val pollStats: StateFlow<PollStats> = _pollStats.asStateFlow()
+    private var activeMode = PollingMode.FAST
+
+    private val planner = PollPlanner()
+
     private val dispatcher = Executors.newSingleThreadExecutor { r ->
         Thread(r, "obd-poller").apply { isDaemon = true }
     }.asCoroutineDispatcher()
@@ -49,12 +76,14 @@ class ObdPoller(
     private val _snapshot = MutableStateFlow(VehicleSnapshot())
     val snapshot: StateFlow<VehicleSnapshot> = _snapshot.asStateFlow()
 
+    /** Working frame: all edits in a cycle land here, published once per cycle. */
+    private val frame = FrameBuffer { _snapshot.value = it }
+
     private val _vehicleInfo = MutableStateFlow(VehicleInfo())
     val vehicleInfo: StateFlow<VehicleInfo> = _vehicleInfo.asStateFlow()
 
     private val running = AtomicBoolean(false)
     private var job: Job? = null
-    private val paused = AtomicBoolean(false)
 
     private val supportedPids = mutableSetOf<Int>()
     private var mapKpa: Float? = null
@@ -73,42 +102,60 @@ class ObdPoller(
         val request: () -> Unit
     )
 
-    fun start() {
-        if (!running.compareAndSet(false, true)) return
-        job = scope.launch(dispatcher) {
+    /**
+     * Starts the poll loop. The returned job completes when the loop ends (connection
+     * drop, error or [stop]); the caller (service) supervises and reconnects.
+     */
+    fun start(): Job {
+        if (!running.compareAndSet(false, true)) return job ?: Job().also { it.complete() }
+        val started = scope.launch(dispatcher) {
             try {
-                discoverCapabilities()
+                connectionLock.withLock {
+                    discoverCapabilities()
+                    frame.publish()
+                }
                 var slowIndex = 0
-                var slowPids = buildSlowQueue()
-                var lastAssignmentSig = assignmentsProvider().joinToString { it.encode() }
+                activeMode = pollingModeProvider()
+                var slowPids = rebuildPlan()
+                var lastAssignments = assignmentsProvider()
                 while (isActive && running.get() && connection.isOpen) {
-                    if (paused.get()) {
-                        Thread.sleep(50)
-                        continue
+                    connectionLock.withLock {
+                        val current = assignmentsProvider()
+                        val wanted = pollingModeProvider()
+                        // Identity first (cheap); structural compare only when the list instance changed.
+                        val assignmentsChanged = current !== lastAssignments && current != lastAssignments
+                        lastAssignments = current
+                        if (assignmentsChanged) discoverCapabilities()
+                        if (assignmentsChanged || wanted != activeMode) {
+                            if (wanted != activeMode) Log.i(TAG, "Polling mode -> $wanted")
+                            activeMode = wanted
+                            slowPids = rebuildPlan()
+                            slowIndex = 0
+                        }
+                        if (activeMode == PollingMode.LEGACY) {
+                            pollRpm()
+                            if (slowPids.isNotEmpty()) {
+                                slowPids[slowIndex % slowPids.size].request()
+                                slowIndex++
+                            }
+                        } else {
+                            runFastCycle()
+                        }
+                        finishCycle()
                     }
-                    val sig = assignmentsProvider().joinToString { it.encode() }
-                    if (sig != lastAssignmentSig) {
-                        lastAssignmentSig = sig
-                        discoverCapabilities()
-                        slowPids = buildSlowQueue()
-                        slowIndex = 0
-                    }
-                    pollRpm()
-                    if (slowPids.isNotEmpty()) {
-                        slowPids[slowIndex % slowPids.size].request()
-                        slowIndex++
-                    }
-                    publishAlarms()
                 }
             } catch (ce: CancellationException) {
                 throw ce
             } catch (t: Throwable) {
                 Log.e(TAG, "Poller failed", t)
-                _snapshot.update { it.copy(obdConnected = false) }
+                frame.edit { it.copy(obdConnected = false) }
+                frame.publish()
             } finally {
                 running.set(false)
             }
         }
+        job = started
+        return started
     }
 
     fun stop() {
@@ -116,17 +163,6 @@ class ObdPoller(
         job?.cancel()
         job = null
     }
-
-    /** Pause the poll loop so a scanner can use the connection exclusively. */
-    fun pause() {
-        paused.set(true)
-    }
-
-    fun resume() {
-        paused.set(false)
-    }
-
-    fun isPaused(): Boolean = paused.get()
 
     private fun discoverCapabilities() {
         supportedPids.clear()
@@ -151,7 +187,7 @@ class ObdPoller(
             pollMode01(WrxProfile.Pid.OIL_TEMP) { data ->
                 val temp = StnParser.decodeTempC(data)
                 if (temp != null && temp in -20f..160f) {
-                    _snapshot.update {
+                    frame.edit {
                         it.copy(oilTempC = temp, oilTempSource = oilTempSourceLabel)
                     }
                     Log.i(TAG, "Oil temp via hard-coded 01 5C = $temp C")
@@ -191,8 +227,32 @@ class ObdPoller(
         )
     }
 
+    /**
+     * Runs [block] with the adapter header switched to [header] and always restores the
+     * functional-broadcast header (7DF) afterwards, even when [block] throws.
+     */
+    private inline fun <T> withEcuHeader(header: Int, block: () -> T): T {
+        connection.sendCommand(ObdCommands.setHeader(header))
+        try {
+            return block()
+        } finally {
+            restoreBroadcastHeader()
+        }
+    }
+
+    /** Best effort: a failure here must not mask the exception that got us here. */
+    private fun restoreBroadcastHeader() {
+        try {
+            connection.sendCommand("ATSH7DF")
+        } catch (ce: CancellationException) {
+            throw ce
+        } catch (t: Throwable) {
+            Log.w(TAG, "Could not restore header 7DF", t)
+        }
+    }
+
     private fun assignment(signal: MappableSignal): PidAssignment? =
-        assignmentsProvider().firstOrNull { it.signal == signal }
+        assignmentsProvider().firstOrNull { it.signal == signal && it.isValid }
 
     /** SAE 01 0F when supported; else first plausible Mode 22 IAT candidate (read-only). */
     private fun discoverIat() {
@@ -205,23 +265,23 @@ class ObdPoller(
             val temp = data?.let { StnParser.decodeTempC(it) }
             if (temp != null && temp in -30f..90f) {
                 useMode01Iat = true
-                _snapshot.update { it.copy(intakeAirTempC = temp) }
+                frame.edit { it.copy(intakeAirTempC = temp) }
                 Log.i(TAG, "IAT confirmed via Mode 01 PID 0F = $temp C")
                 return
             }
         }
-        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
+        withEcuHeader(ECU_HEADER) {
         for (candidate in WrxProfile.iatCandidates) {
             val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
             val data = StnParser.parseMode22(raw, candidate.did) ?: continue
             val value = candidate.scale(data) ?: continue
             if (!candidate.plausible(value)) continue
             iatMode22Did = candidate.did
-            _snapshot.update { it.copy(intakeAirTempC = value) }
+            frame.edit { it.copy(intakeAirTempC = value) }
             Log.i(TAG, "IAT confirmed via 22 ${"%04X".format(candidate.did)} = $value C")
             break
         }
-        connection.sendCommand("ATSH7DF")
+        }
         if (iatMode22Did == null && !useMode01Iat) {
             Log.w(TAG, "IAT: no Mode 01/22 source confirmed yet — check PID Log after a deep scan")
         }
@@ -268,7 +328,7 @@ class ObdPoller(
             }
         }
 
-        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
+        withEcuHeader(ECU_HEADER) {
         for (candidate in WrxProfile.mapCandidates) {
             val raw = connection.sendCommand(ObdCommands.mode22(candidate.did))
             val data = StnParser.parseMode22(raw, candidate.did) ?: continue
@@ -280,7 +340,7 @@ class ObdPoller(
             Log.i(TAG, "MAP confirmed via 22 ${"%04X".format(candidate.did)} = $value kPa")
             break
         }
-        connection.sendCommand("ATSH7DF")
+        }
         if (mapMode22Did == null && !useMode01Map) {
             Log.w(TAG, "MAP/boost: no Mode 01/22 source confirmed yet — check PID Log after a deep scan")
         }
@@ -291,30 +351,30 @@ class ObdPoller(
         val assignments = assignmentsProvider()
 
         fun addAssigned(signal: MappableSignal, name: String, apply: (Float) -> Unit) {
-            val a = assignments.firstOrNull { it.signal == signal } ?: return
+            val a = assignments.firstOrNull { it.signal == signal && it.isValid } ?: return
             list += SlowPid(name) { pollAssigned(a, apply) }
         }
 
         if (assignment(MappableSignal.COOLANT) != null) {
             addAssigned(MappableSignal.COOLANT, "coolant") { v ->
-                _snapshot.update { it.copy(coolantC = v) }
+                frame.edit { it.copy(coolantC = v) }
             }
         } else {
             list += SlowPid("coolant") {
                 pollMode01(WrxProfile.Pid.COOLANT) { data ->
-                    _snapshot.update { it.copy(coolantC = StnParser.decodeTempC(data)) }
+                    frame.edit { it.copy(coolantC = StnParser.decodeTempC(data)) }
                 }
             }
         }
 
         if (assignment(MappableSignal.IAT) != null) {
             addAssigned(MappableSignal.IAT, "iat") { v ->
-                _snapshot.update { it.copy(intakeAirTempC = v) }
+                frame.edit { it.copy(intakeAirTempC = v) }
             }
         } else if (useMode01Iat) {
             list += SlowPid("iat") {
                 pollMode01(WrxProfile.Pid.IAT) { data ->
-                    _snapshot.update { it.copy(intakeAirTempC = StnParser.decodeTempC(data)) }
+                    frame.edit { it.copy(intakeAirTempC = StnParser.decodeTempC(data)) }
                 }
             }
         } else {
@@ -324,7 +384,7 @@ class ObdPoller(
                         val candidate = WrxProfile.iatCandidates.first { it.did == did }
                         val value = candidate.scale(data)
                         if (value != null && candidate.plausible(value)) {
-                            _snapshot.update { it.copy(intakeAirTempC = value) }
+                            frame.edit { it.copy(intakeAirTempC = value) }
                         }
                     }
                 }
@@ -371,7 +431,7 @@ class ObdPoller(
         list += SlowPid("speed") {
             pollMode01(WrxProfile.Pid.SPEED) { data ->
                 val kph = StnParser.decodeSpeedKph(data)
-                _snapshot.update { it.copy(obdSpeedKph = kph) }
+                frame.edit { it.copy(obdSpeedKph = kph) }
                 updateGear()
             }
         }
@@ -379,7 +439,7 @@ class ObdPoller(
         if (supportedPids.contains(WrxProfile.Pid.THROTTLE_ABS) || supportedPids.isEmpty()) {
             list += SlowPid("throttle") {
                 pollMode01(WrxProfile.Pid.THROTTLE_ABS) { data ->
-                    _snapshot.update { it.copy(throttlePercent = StnParser.decodePercent(data)) }
+                    frame.edit { it.copy(throttlePercent = StnParser.decodePercent(data)) }
                 }
             }
         }
@@ -387,24 +447,24 @@ class ObdPoller(
         if (supportedPids.contains(WrxProfile.Pid.ACCEL_PEDAL_D) || supportedPids.isEmpty()) {
             list += SlowPid("accelPedal") {
                 pollMode01(WrxProfile.Pid.ACCEL_PEDAL_D) { data ->
-                    _snapshot.update { it.copy(acceleratorPercent = StnParser.decodePercent(data)) }
+                    frame.edit { it.copy(acceleratorPercent = StnParser.decodePercent(data)) }
                 }
             }
         }
         list += SlowPid("mil") {
             pollMode01(WrxProfile.Pid.MONITOR_STATUS) { data ->
-                _snapshot.update { it.copy(milOn = StnParser.decodeMil(data)) }
+                frame.edit { it.copy(milOn = StnParser.decodeMil(data)) }
             }
         }
 
         if (assignment(MappableSignal.BATTERY) != null) {
             addAssigned(MappableSignal.BATTERY, "voltage") { v ->
-                _snapshot.update { it.copy(batteryVolts = v) }
+                frame.edit { it.copy(batteryVolts = v) }
             }
         } else {
             list += SlowPid("voltage") {
                 pollMode01(WrxProfile.Pid.CONTROL_MODULE_VOLTAGE) { data ->
-                    _snapshot.update { it.copy(batteryVolts = StnParser.decodeVoltage(data)) }
+                    frame.edit { it.copy(batteryVolts = StnParser.decodeVoltage(data)) }
                 }
             }
         }
@@ -412,14 +472,14 @@ class ObdPoller(
         if (supportedPids.contains(WrxProfile.Pid.FUEL_LEVEL) || supportedPids.isEmpty()) {
             list += SlowPid("fuel") {
                 pollMode01(WrxProfile.Pid.FUEL_LEVEL) { data ->
-                    _snapshot.update { it.copy(fuelLevelPercent = StnParser.decodePercent(data)) }
+                    frame.edit { it.copy(fuelLevelPercent = StnParser.decodePercent(data)) }
                 }
             }
         }
 
         if (assignment(MappableSignal.AFR) != null) {
             addAssigned(MappableSignal.AFR, "afr") { v ->
-                _snapshot.update { it.copy(afr = v) }
+                frame.edit { it.copy(afr = v) }
             }
         } else {
             val afrPid = when {
@@ -433,7 +493,7 @@ class ObdPoller(
                 list += SlowPid("afr") {
                     pollMode01(afrPid) { data ->
                         StnParser.decodeAfr(data, WrxProfile.STOICH_AFR)?.let { afr ->
-                            _snapshot.update { it.copy(afr = afr) }
+                            frame.edit { it.copy(afr = afr) }
                         }
                     }
                 }
@@ -442,7 +502,7 @@ class ObdPoller(
 
         if (assignment(MappableSignal.OIL_TEMP) != null) {
             addAssigned(MappableSignal.OIL_TEMP, "oilTemp") { v ->
-                _snapshot.update {
+                frame.edit {
                     it.copy(oilTempC = v, oilTempSource = "user")
                 }
             }
@@ -452,7 +512,7 @@ class ObdPoller(
                 pollMode01(WrxProfile.Pid.OIL_TEMP) { data ->
                     val temp = StnParser.decodeTempC(data)
                     if (temp != null && temp in -20f..160f) {
-                        _snapshot.update {
+                        frame.edit {
                             it.copy(oilTempC = temp, oilTempSource = "01 5C")
                         }
                     }
@@ -463,7 +523,7 @@ class ObdPoller(
         if (assignment(MappableSignal.OIL_PRESSURE) != null) {
             addAssigned(MappableSignal.OIL_PRESSURE, "oilPressure") { v ->
                 // Decoder stores 1 = Normal, 0 = Low.
-                _snapshot.update { it.copy(oilPressureOk = v >= 0.5f) }
+                frame.edit { it.copy(oilPressureOk = v >= 0.5f) }
             }
         }
 
@@ -478,9 +538,9 @@ class ObdPoller(
             }
             0x22 -> {
                 val header = assignment.header ?: ECU_HEADER
-                connection.sendCommand(ObdCommands.setHeader(header))
-                val raw = connection.sendCommand(ObdCommands.mode22(assignment.id))
-                connection.sendCommand("ATSH7DF")
+                val raw = withEcuHeader(header) {
+                    connection.sendCommand(ObdCommands.mode22(assignment.id))
+                }
                 StnParser.parseMode22(raw, assignment.id)
             }
             else -> null
@@ -494,8 +554,9 @@ class ObdPoller(
         val raw = connection.sendCommand(ObdCommands.mode01(WrxProfile.Pid.RPM))
         val data = StnParser.parseMode01(raw, WrxProfile.Pid.RPM) ?: return
         val rpm = StnParser.decodeRpm(data) ?: return
+        meter.rpmSample()
         val now = System.currentTimeMillis()
-        _snapshot.update { current ->
+        frame.edit { current ->
             current.copy(
                 timestampMs = now,
                 previousRpm = current.rpm,
@@ -515,9 +576,7 @@ class ObdPoller(
     }
 
     private fun pollMode22(did: Int, onData: (ByteArray) -> Unit) {
-        connection.sendCommand(ObdCommands.setHeader(ECU_HEADER))
-        val raw = connection.sendCommand(ObdCommands.mode22(did))
-        connection.sendCommand("ATSH7DF")
+        val raw = withEcuHeader(ECU_HEADER) { connection.sendCommand(ObdCommands.mode22(did)) }
         val data = StnParser.parseMode22(raw, did) ?: return
         onData(data)
     }
@@ -526,12 +585,12 @@ class ObdPoller(
         val map = mapKpa ?: return
         val baro = baroKpa ?: 101f
         val boostKpa = map - baro
-        _snapshot.update { it.copy(boostPsi = UnitConverters.kpaToPsi(boostKpa)) }
+        frame.edit { it.copy(boostPsi = UnitConverters.kpaToPsi(boostKpa)) }
     }
 
     private fun updateGear() {
-        val rpm = _snapshot.value.rpm?.toDouble() ?: return
-        val kph = _snapshot.value.obdSpeedKph ?: return
+        val rpm = frame.value.rpm?.toDouble() ?: return
+        val kph = frame.value.obdSpeedKph ?: return
         val speedMps = UnitConverters.kphToMps(kph).toDouble()
         val cfg = gearConfigProvider()
         val gear = GearCalculator.estimateGear(
@@ -540,21 +599,283 @@ class ObdPoller(
             transmission = cfg.transmission,
             tireCircumferenceM = cfg.tireCircumferenceM
         )
-        val (gpsSpeed, gpsFix) = gpsSpeedProvider()
-        _snapshot.update {
-            it.copy(
-                gear = gear,
-                gpsSpeedMps = gpsSpeed,
-                gpsHasFix = gpsFix
-            )
-        }
+        frame.edit { it.copy(gear = gear) }
     }
 
-    private fun publishAlarms() {
+    /** End of cycle: attach GPS + alarms (evaluated once) and publish the frame once. */
+    private fun finishCycle() {
         val (gpsSpeed, gpsFix) = gpsSpeedProvider()
-        _snapshot.update { current ->
+        frame.edit { current ->
             val withGps = current.copy(gpsSpeedMps = gpsSpeed, gpsHasFix = gpsFix)
             withGps.copy(alarms = AlarmEvaluator.evaluate(withGps, thresholdsProvider(), expectObd = true))
         }
+        frame.publish()
+        meter.cycle()
+        val now = System.currentTimeMillis()
+        meter.tick(now, activeMode)?.let { _pollStats.value = it }
+        meter.logLine(now, activeMode)?.let { Log.i(TAG, it) }
+    }
+
+    // ---------------------------------------------------------------- Fast polling mode
+
+    /** Builds the queue for [activeMode]; legacy returns the slow-PID round-robin list. */
+    private fun rebuildPlan(): List<SlowPid> =
+        if (activeMode == PollingMode.LEGACY) {
+            buildSlowQueue()
+        } else {
+            planner.configure(buildFastItems(), supportedPids)
+            emptyList()
+        }
+
+    private fun applyRpm(data: ByteArray) {
+        val rpm = StnParser.decodeRpm(data) ?: return
+        meter.rpmSample()
+        val now = System.currentTimeMillis()
+        frame.edit { current ->
+            current.copy(
+                timestampMs = now,
+                previousRpm = current.rpm,
+                rpm = rpm,
+                rpmSampleAgeMs = if (current.timestampMs == 0L) 0 else (now - current.timestampMs),
+                obdConnected = true,
+                usingSimulator = false
+            )
+        }
+        updateGear()
+    }
+
+    private fun buildFastItems(): List<PollItem> {
+        val list = mutableListOf<PollItem>()
+        val unknown = supportedPids.isEmpty()
+
+        fun assigned(
+            signal: MappableSignal,
+            key: String,
+            tier: PollTier,
+            apply: (Float) -> Unit
+        ): Boolean {
+            val a = assignment(signal) ?: return false
+            list += PollItem(key, a.id, tier, a.mode, a.header) { data ->
+                val decoded = PidValueDecoder.decode(data, a.decode) ?: return@PollItem
+                apply(PidValueDecoder.toSnapshotValue(a.signal, a.decode, decoded))
+            }
+            return true
+        }
+
+        fun mode01(key: String, pid: Int, tier: PollTier, onData: (ByteArray) -> Unit) {
+            list += PollItem(key, pid, tier, onData = onData)
+        }
+
+        // FAST: every cycle, one batched request.
+        mode01("rpm", WrxProfile.Pid.RPM, PollTier.FAST, ::applyRpm)
+        mode01("speed", WrxProfile.Pid.SPEED, PollTier.FAST) { data ->
+            frame.edit { it.copy(obdSpeedKph = StnParser.decodeSpeedKph(data)) }
+            updateGear()
+        }
+        if (supportedPids.contains(WrxProfile.Pid.THROTTLE_ABS) || unknown) {
+            mode01("throttle", WrxProfile.Pid.THROTTLE_ABS, PollTier.FAST) { data ->
+                frame.edit { it.copy(throttlePercent = StnParser.decodePercent(data)) }
+            }
+        }
+        if (supportedPids.contains(WrxProfile.Pid.ACCEL_PEDAL_D) || unknown) {
+            mode01("accelPedal", WrxProfile.Pid.ACCEL_PEDAL_D, PollTier.FAST) { data ->
+                frame.edit { it.copy(acceleratorPercent = StnParser.decodePercent(data)) }
+            }
+        }
+
+        // MEDIUM: MAP / boost every 2nd cycle.
+        if (!assigned(MappableSignal.BOOST_MAP, "map", PollTier.MEDIUM) { v ->
+                mapKpa = v
+                updateBoost()
+            }
+        ) {
+            if (useMode01Map) {
+                val pid = mapMode01Pid
+                mode01("map", pid, PollTier.MEDIUM) { data ->
+                    mapKpa = if (pid == WrxProfile.Pid.MAP_ABS) {
+                        StnParser.decodeAbsoluteMapKpa(data)
+                    } else {
+                        StnParser.decodePressureKpa(data)
+                    }
+                    updateBoost()
+                }
+            } else {
+                mapMode22Did?.let { did ->
+                    list += PollItem("map", did, PollTier.MEDIUM, 0x22, ECU_HEADER) { data ->
+                        val candidate = WrxProfile.mapCandidates.first { it.did == did }
+                        val value = candidate.scale(data)
+                        if (value != null && candidate.plausible(value)) {
+                            mapKpa = value
+                            updateBoost()
+                        }
+                    }
+                }
+            }
+        }
+
+        // SLOW: about 1 Hz, batched.
+        if (!assigned(MappableSignal.COOLANT, "coolant", PollTier.SLOW) { v ->
+                frame.edit { it.copy(coolantC = v) }
+            }
+        ) {
+            mode01("coolant", WrxProfile.Pid.COOLANT, PollTier.SLOW) { data ->
+                frame.edit { it.copy(coolantC = StnParser.decodeTempC(data)) }
+            }
+        }
+        if (!assigned(MappableSignal.IAT, "iat", PollTier.SLOW) { v ->
+                frame.edit { it.copy(intakeAirTempC = v) }
+            }
+        ) {
+            if (useMode01Iat) {
+                mode01("iat", WrxProfile.Pid.IAT, PollTier.SLOW) { data ->
+                    frame.edit { it.copy(intakeAirTempC = StnParser.decodeTempC(data)) }
+                }
+            } else {
+                iatMode22Did?.let { did ->
+                    list += PollItem("iat", did, PollTier.SLOW, 0x22, ECU_HEADER) { data ->
+                        val candidate = WrxProfile.iatCandidates.first { it.did == did }
+                        val value = candidate.scale(data)
+                        if (value != null && candidate.plausible(value)) {
+                            frame.edit { it.copy(intakeAirTempC = value) }
+                        }
+                    }
+                }
+            }
+        }
+        mode01("baro", WrxProfile.Pid.BARO, PollTier.SLOW) { data ->
+            baroKpa = StnParser.decodePressureKpa(data)
+            updateBoost()
+        }
+        if (!assigned(MappableSignal.BATTERY, "voltage", PollTier.SLOW) { v ->
+                frame.edit { it.copy(batteryVolts = v) }
+            }
+        ) {
+            mode01("voltage", WrxProfile.Pid.CONTROL_MODULE_VOLTAGE, PollTier.SLOW) { data ->
+                frame.edit { it.copy(batteryVolts = StnParser.decodeVoltage(data)) }
+            }
+        }
+        if (supportedPids.contains(WrxProfile.Pid.FUEL_LEVEL) || unknown) {
+            mode01("fuel", WrxProfile.Pid.FUEL_LEVEL, PollTier.SLOW) { data ->
+                frame.edit { it.copy(fuelLevelPercent = StnParser.decodePercent(data)) }
+            }
+        }
+        if (!assigned(MappableSignal.AFR, "afr", PollTier.SLOW) { v ->
+                frame.edit { it.copy(afr = v) }
+            }
+        ) {
+            val afrPid = when {
+                supportedPids.contains(WrxProfile.Pid.O2_EQ_RATIO) || unknown ->
+                    WrxProfile.Pid.O2_EQ_RATIO
+                supportedPids.contains(WrxProfile.Pid.COMMANDED_EQ_RATIO) ->
+                    WrxProfile.Pid.COMMANDED_EQ_RATIO
+                else -> null
+            }
+            if (afrPid != null) {
+                mode01("afr", afrPid, PollTier.SLOW) { data ->
+                    StnParser.decodeAfr(data, WrxProfile.STOICH_AFR)?.let { afr ->
+                        frame.edit { it.copy(afr = afr) }
+                    }
+                }
+            }
+        }
+        if (!assigned(MappableSignal.OIL_TEMP, "oilTemp", PollTier.SLOW) { v ->
+                frame.edit { it.copy(oilTempC = v, oilTempSource = "user") }
+            }
+        ) {
+            mode01("oilTemp", WrxProfile.Pid.OIL_TEMP, PollTier.SLOW) { data ->
+                val temp = StnParser.decodeTempC(data)
+                if (temp != null && temp in -20f..160f) {
+                    frame.edit { it.copy(oilTempC = temp, oilTempSource = "01 5C") }
+                }
+            }
+        }
+        assigned(MappableSignal.OIL_PRESSURE, "oilPressure", PollTier.SLOW) { v ->
+            // Decoder stores 1 = Normal, 0 = Low.
+            frame.edit { it.copy(oilPressureOk = v >= 0.5f) }
+        }
+
+        // MIL every ~5 s.
+        mode01("mil", WrxProfile.Pid.MONITOR_STATUS, PollTier.MIL) { data ->
+            frame.edit { it.copy(milOn = StnParser.decodeMil(data)) }
+        }
+        return list
+    }
+
+    private fun runFastCycle() {
+        val plan = planner.nextCycle(clockMs())
+        for (request in plan.mode01) execMode01(request)
+        if (plan.mode22.isNotEmpty()) {
+            try {
+                for (group in plan.mode22) {
+                    connection.sendCommand(ObdCommands.setHeader(group.header))
+                    for (item in group.items) {
+                        val raw = connection.sendCommand(ObdCommands.mode22(item.pid))
+                        StnParser.parseMode22(raw, item.pid)?.let(item.onData)
+                    }
+                }
+            } finally {
+                restoreBroadcastHeader()
+            }
+        }
+    }
+
+    /** Sends one Mode 01 request for [items], falling back per the health rules. */
+    private fun execMode01(items: List<PollItem>) {
+        val pids = items.map { it.pid }
+        val health = planner.health
+        var result = requestMode01(pids)
+        if (pids.size > 1) {
+            val missing = result.missing
+            if (missing.isEmpty()) {
+                pids.forEach(health::batchSucceeded)
+            } else {
+                // Split: ask the missing PIDs alone. A PID that works alone but failed in the
+                // batch earns a strike; whole-batch failure degrades all of them at once.
+                val values = LinkedHashMap(result.values)
+                for (pid in missing) {
+                    val single = requestMode01(listOf(pid))
+                    single.values[pid]?.let {
+                        values[pid] = it
+                        health.batchFailed(
+                            pid,
+                            if (missing.size == pids.size) PollHealth.FAIL_LIMIT else 1
+                        )
+                    }
+                }
+                if (health.noBatch.any { it in missing }) {
+                    Log.w(TAG, "Batch degraded to singles for ${health.noBatch.map { "%02X".format(it) }}")
+                }
+                result = StnParser.MultiPidResult(values, pids.filter { it !in values }, result.responseCount)
+            }
+        }
+        for (item in items) result.values[item.pid]?.let(item.onData)
+    }
+
+    /** One Mode 01 command for [pids] (hinted when safe); learns hint/ECU-count per PID. */
+    private fun requestMode01(pids: List<Int>): StnParser.MultiPidResult {
+        val health = planner.health
+        val hinted = health.canHint(pids)
+        var result = StnParser.parseMultiPid(
+            connection.sendCommand(ObdCommands.mode01Multi(pids, if (hinted) 1 else null)),
+            pids
+        )
+        if (hinted) {
+            if (result.missing.isNotEmpty()) {
+                // Hint may have cut the reply short: retry without it, remember per PID.
+                val retry = StnParser.parseMultiPid(
+                    connection.sendCommand(ObdCommands.mode01Multi(pids)),
+                    pids
+                )
+                if (retry.missing.size < result.missing.size) {
+                    result.missing.filter { it in retry.values }.forEach { health.noHint += it }
+                    result = retry
+                }
+            }
+        } else if (result.responseCount == 1) {
+            result.values.keys.forEach { health.singleEcu += it }
+        } else if (result.responseCount > 1) {
+            health.noHint += pids
+        }
+        return result
     }
 }

@@ -1,27 +1,14 @@
 package com.wrxhud.hud
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import com.wrxhud.settings.HudColorTheme
+import com.wrxhud.settings.MotionSetting
 
-/**
- * Active HUD palette. Reading any [HudColors] property during composition
- * subscribes to [colorTheme] so the UI recomposes when the theme flips.
- */
-object HudThemeController {
-    var colorTheme by mutableStateOf(HudColorTheme.CLASSIC)
-
-    /** @deprecated Prefer [colorTheme]; kept for call sites during migration. */
-    var pinkyMode: Boolean
-        get() = colorTheme == HudColorTheme.PINKY
-        set(value) {
-            colorTheme = if (value) HudColorTheme.PINKY else HudColorTheme.CLASSIC
-        }
-}
-
-private data class HudColorScheme(
+internal data class HudColorScheme(
     val background: Color,
     val panel: Color,
     val border: Color,
@@ -49,48 +36,142 @@ private data class HudColorScheme(
     val attitudeInk: Color
 )
 
-private val ClassicScheme = HudColorScheme(
-    background = Color(0xFF050505),
-    panel = Color(0xFF121212),
-    border = Color(0xFF2A2A2A),
-    textPrimary = Color(0xFFF5F5F5),
-    textDim = Color(0xFF8A8A8A),
-    accent = Color(0xFFE10600),
+/** Dark / Modern (default). */
+private val DarkScheme = HudColorScheme(
+    background = Color(0xFF0A0F1E),
+    panel = Color(0xFF141928),
+    border = Color(0xFF242C40),
+    textPrimary = Color(0xFFE6EAF3),
+    textDim = Color(0xFF94A0BB),
+    accent = Color(0xFF38BDF8),
     boostBlue = Color(0xFF3B82F6),
-    green = Color(0xFF22C55E),
-    amber = Color(0xFFF59E0B),
-    red = Color(0xFFEF4444),
-    tachTrack = Color(0xFF1F1F1F),
+    green = Color(0xFF4ADE80),
+    amber = Color(0xFFFBBF24),
+    red = Color(0xFFF43F5E),
+    tachTrack = Color(0xFF1A2136),
+    tachFill = Color(0xFFE6EAF3),
+    lampOff = Color(0xFF222A3F),
+    attitudeRingUpper = Color(0xFF2DD4BF),
+    attitudeRingLower = Color(0xFF3B82F6),
+    attitudeGlow = Color(0xFF38BDF8),
+    attitudeHorizon = Color(0xFF94A0BB),
+    attitudeFace = Color(0xFF060A15),
+    attitudeInk = Color(0xFF0A0F1E)
+)
+
+/** Daylight. */
+private val LightScheme = HudColorScheme(
+    background = Color(0xFFEEF2F9),
+    panel = Color(0xFFE3E7EF),
+    border = Color(0xFFC3CAD6),
+    textPrimary = Color(0xFF0F172A),
+    textDim = Color(0xFF475569),
+    accent = Color(0xFF0284C7),
+    boostBlue = Color(0xFF0284C7),
+    green = Color(0xFF15803D),
+    amber = Color(0xFFB45309),
+    red = Color(0xFFDC2626),
+    tachTrack = Color(0xFFD3DAE7),
+    tachFill = Color(0xFF0F172A),
+    lampOff = Color(0xFFC9D1DF),
+    attitudeRingUpper = Color(0xFF0D9488),
+    attitudeRingLower = Color(0xFF0284C7),
+    attitudeGlow = Color(0xFF0284C7),
+    attitudeHorizon = Color(0xFF475569),
+    attitudeFace = Color(0xFFF8FAFD),
+    attitudeInk = Color(0xFFDCE3EE)
+)
+
+/** High contrast: black, white and yellow. */
+private val ContrastScheme = HudColorScheme(
+    background = Color(0xFF000000),
+    panel = Color(0xFF0D0D0D),
+    border = Color(0xFFFFFFFF),
+    textPrimary = Color(0xFFFFFFFF),
+    textDim = Color(0xFFF0F0F0),
+    accent = Color(0xFFFFD400),
+    boostBlue = Color(0xFFFFD400),
+    green = Color(0xFF00FF66),
+    amber = Color(0xFFFFD400),
+    red = Color(0xFFFF3030),
+    tachTrack = Color(0xFF262626),
+    tachFill = Color(0xFFFFFFFF),
+    lampOff = Color(0xFF333333),
+    attitudeRingUpper = Color(0xFFFFD400),
+    attitudeRingLower = Color(0xFFFFD400),
+    attitudeGlow = Color(0xFFFFD400),
+    attitudeHorizon = Color(0xFFF0F0F0),
+    attitudeFace = Color(0xFF000000),
+    attitudeInk = Color(0xFF000000)
+)
+
+/** Pure black. */
+private val OledScheme = HudColorScheme(
+    background = Color(0xFF000000),
+    panel = Color(0xFF0A0A0A),
+    border = Color(0xFF242424),
+    textPrimary = Color(0xFFE8E8E8),
+    textDim = Color(0xFF8A8A8A),
+    accent = Color(0xFF38BDF8),
+    boostBlue = Color(0xFF3B82F6),
+    green = Color(0xFF4ADE80),
+    amber = Color(0xFFFBBF24),
+    red = Color(0xFFF43F5E),
+    tachTrack = Color(0xFF141414),
     tachFill = Color(0xFFE8E8E8),
-    lampOff = Color(0xFF2A2A2A),
-    attitudeRingUpper = Color(0xFFB8F000),
-    attitudeRingLower = Color(0xFF00E5FF),
-    attitudeGlow = Color(0xFFE8FF4A),
-    attitudeHorizon = Color(0xFF94A3B8),
+    lampOff = Color(0xFF1C1C1C),
+    attitudeRingUpper = Color(0xFF2DD4BF),
+    attitudeRingLower = Color(0xFF3B82F6),
+    attitudeGlow = Color(0xFF38BDF8),
+    attitudeHorizon = Color(0xFF8A8A8A),
     attitudeFace = Color(0xFF000000),
     attitudeInk = Color(0xFF0A0A0A)
 )
 
-private val PinkyScheme = HudColorScheme(
-    background = Color(0xFF14080F),
-    panel = Color(0xFF261018),
-    border = Color(0xFF6B3A52),
-    textPrimary = Color(0xFFFFF0F6),
-    textDim = Color(0xFFD4A0B5),
-    accent = Color(0xFFFF4FA3),
-    boostBlue = Color(0xFFF472B6),
-    green = Color(0xFFF9A8D4),
-    amber = Color(0xFFFB7185),
-    red = Color(0xFFE11D8A),
-    tachTrack = Color(0xFF2A1520),
-    tachFill = Color(0xFFFFE4F0),
-    lampOff = Color(0xFF3D2433),
-    attitudeRingUpper = Color(0xFFFF8AC4),
-    attitudeRingLower = Color(0xFFF472B6),
-    attitudeGlow = Color(0xFFFFB7D5),
-    attitudeHorizon = Color(0xFFD4A0B5),
-    attitudeFace = Color(0xFF1A0A12),
-    attitudeInk = Color(0xFF2A1018)
+/** Navy and coral. */
+private val ClaudeScheme = HudColorScheme(
+    background = Color(0xFF0E141B),
+    panel = Color(0xFF17202B),
+    border = Color(0xFF27323F),
+    textPrimary = Color(0xFFECEEF0),
+    textDim = Color(0xFF8B98A5),
+    accent = Color(0xFFD97757),
+    boostBlue = Color(0xFFCF6A47),
+    green = Color(0xFF59BF40),
+    amber = Color(0xFFE5C23A),
+    red = Color(0xFFE14B4B),
+    tachTrack = Color(0xFF1F2A37),
+    tachFill = Color(0xFFECEEF0),
+    lampOff = Color(0xFF27323F),
+    attitudeRingUpper = Color(0xFFE9A58C),
+    attitudeRingLower = Color(0xFFCF6A47),
+    attitudeGlow = Color(0xFFD97757),
+    attitudeHorizon = Color(0xFF8B98A5),
+    attitudeFace = Color(0xFF0A0F15),
+    attitudeInk = Color(0xFF0E141B)
+)
+
+/** Handheld blue. */
+private val HandheldScheme = HudColorScheme(
+    background = Color(0xFF0E141B),
+    panel = Color(0xFF1F2630),
+    border = Color(0xFF2A313B),
+    textPrimary = Color(0xFFDCDEDF),
+    textDim = Color(0xFF8B929A),
+    accent = Color(0xFF1A9FFF),
+    boostBlue = Color(0xFF1A9FFF),
+    green = Color(0xFF59BF40),
+    amber = Color(0xFFE5C23A),
+    red = Color(0xFFE14B4B),
+    tachTrack = Color(0xFF262E3A),
+    tachFill = Color(0xFFDCDEDF),
+    lampOff = Color(0xFF2A313B),
+    attitudeRingUpper = Color(0xFF66C0F4),
+    attitudeRingLower = Color(0xFF1A9FFF),
+    attitudeGlow = Color(0xFF1A9FFF),
+    attitudeHorizon = Color(0xFF8B929A),
+    attitudeFace = Color(0xFF0A0F15),
+    attitudeInk = Color(0xFF0E141B)
 )
 
 /** Deeper blacks, muted chromas — easier on night eyes. */
@@ -114,32 +195,6 @@ private val NightScheme = HudColorScheme(
     attitudeHorizon = Color(0xFF525252),
     attitudeFace = Color(0xFF050505),
     attitudeInk = Color(0xFF0A0A0A)
-)
-
-/**
- * High-contrast daylight “e-ink” look — cream paper + black ink.
- * Refreshes at the same rate as other themes (no slow e-ink simulation).
- */
-private val EinkScheme = HudColorScheme(
-    background = Color(0xFFF2EFE6),
-    panel = Color(0xFFE8E4D9),
-    border = Color(0xFF2A2A2A),
-    textPrimary = Color(0xFF111111),
-    textDim = Color(0xFF4A4A4A),
-    accent = Color(0xFF111111),
-    boostBlue = Color(0xFF1A1A1A),
-    green = Color(0xFF333333),
-    amber = Color(0xFF222222),
-    red = Color(0xFF000000),
-    tachTrack = Color(0xFFD4D0C4),
-    tachFill = Color(0xFF111111),
-    lampOff = Color(0xFFC8C4B8),
-    attitudeRingUpper = Color(0xFF2A2A2A),
-    attitudeRingLower = Color(0xFF5A5A5A),
-    attitudeGlow = Color(0xFF111111),
-    attitudeHorizon = Color(0xFF6B6B6B),
-    attitudeFace = Color(0xFFF7F4EB),
-    attitudeInk = Color(0xFFD4D0C4)
 )
 
 /** Classic green/amber phosphor LCD (VFD-adjacent) cockpit. */
@@ -175,32 +230,63 @@ data class AttitudePalette(
     val ink: Color
 )
 
+internal fun hudColorScheme(theme: HudColorTheme): HudColorScheme = when (theme) {
+    HudColorTheme.DARK -> DarkScheme
+    HudColorTheme.LIGHT -> LightScheme
+    HudColorTheme.CONTRAST -> ContrastScheme
+    HudColorTheme.OLED -> OledScheme
+    HudColorTheme.CLAUDE -> ClaudeScheme
+    HudColorTheme.HANDHELD -> HandheldScheme
+    HudColorTheme.NIGHT -> NightScheme
+    HudColorTheme.RETRO_LCD -> RetroLcdScheme
+}
+
+internal val LocalHudColors = staticCompositionLocalOf { hudColorScheme(HudColorTheme.DARK) }
+
+/** Provides the palette and motion preference to everything below it. */
+@Composable
+fun HudTheme(theme: HudColorTheme, motion: MotionSetting? = null, content: @Composable () -> Unit) {
+    CompositionLocalProvider(
+        LocalHudColors provides hudColorScheme(theme),
+        LocalHudMotion provides motion,
+        content = content
+    )
+}
+
+/** The palette of the nearest [HudTheme]. */
 object HudColors {
     private val scheme: HudColorScheme
-        get() = when (HudThemeController.colorTheme) {
-            HudColorTheme.CLASSIC -> ClassicScheme
-            HudColorTheme.PINKY -> PinkyScheme
-            HudColorTheme.NIGHT -> NightScheme
-            HudColorTheme.EINK -> EinkScheme
-            HudColorTheme.RETRO_LCD -> RetroLcdScheme
-        }
+        @Composable @ReadOnlyComposable get() = LocalHudColors.current
 
-    val Background: Color get() = scheme.background
-    val Panel: Color get() = scheme.panel
-    val Border: Color get() = scheme.border
-    val TextPrimary: Color get() = scheme.textPrimary
-    val TextDim: Color get() = scheme.textDim
-    val Accent: Color get() = scheme.accent
-    val BoostBlue: Color get() = scheme.boostBlue
-    val Green: Color get() = scheme.green
-    val Amber: Color get() = scheme.amber
-    val Red: Color get() = scheme.red
-    val TachTrack: Color get() = scheme.tachTrack
-    val TachFill: Color get() = scheme.tachFill
-    val LampOff: Color get() = scheme.lampOff
+    val Background: Color
+        @Composable @ReadOnlyComposable get() = scheme.background
+    val Panel: Color
+        @Composable @ReadOnlyComposable get() = scheme.panel
+    val Border: Color
+        @Composable @ReadOnlyComposable get() = scheme.border
+    val TextPrimary: Color
+        @Composable @ReadOnlyComposable get() = scheme.textPrimary
+    val TextDim: Color
+        @Composable @ReadOnlyComposable get() = scheme.textDim
+    val Accent: Color
+        @Composable @ReadOnlyComposable get() = scheme.accent
+    val BoostBlue: Color
+        @Composable @ReadOnlyComposable get() = scheme.boostBlue
+    val Green: Color
+        @Composable @ReadOnlyComposable get() = scheme.green
+    val Amber: Color
+        @Composable @ReadOnlyComposable get() = scheme.amber
+    val Red: Color
+        @Composable @ReadOnlyComposable get() = scheme.red
+    val TachTrack: Color
+        @Composable @ReadOnlyComposable get() = scheme.tachTrack
+    val TachFill: Color
+        @Composable @ReadOnlyComposable get() = scheme.tachFill
+    val LampOff: Color
+        @Composable @ReadOnlyComposable get() = scheme.lampOff
 
     val Attitude: AttitudePalette
-        get() = AttitudePalette(
+        @Composable @ReadOnlyComposable get() = AttitudePalette(
             face = scheme.attitudeFace,
             ringUpper = scheme.attitudeRingUpper,
             ringLower = scheme.attitudeRingLower,

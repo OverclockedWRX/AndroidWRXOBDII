@@ -1,5 +1,6 @@
 package com.wrxhud.obd
 
+import android.util.Log
 import com.wrxhud.vehicle.UnitConverters
 import com.wrxhud.vehicle.WrxProfile
 
@@ -36,6 +37,14 @@ data class PidAssignment(
     val decode: PidDecode,
     val header: Int? = null
 ) {
+    /** True when mode, id and header are inside the ranges the adapter commands accept. */
+    val isValid: Boolean
+        get() = when (mode) {
+            0x01 -> id in 0..0xFF
+            0x22 -> id in 0..ObdCommands.MAX_DID
+            else -> false
+        } && (header == null || header in 0..ObdCommands.MAX_HEADER)
+
     fun addressLabel(): String = when (mode) {
         0x01 -> "01 %02X".format(id)
         0x22 -> "22 %04X".format(id)
@@ -48,6 +57,12 @@ data class PidAssignment(
     }
 
     companion object {
+        private fun rejected(raw: String): PidAssignment? {
+            // Stored values are user data; never throw, just drop (value not logged in full).
+            runCatching { Log.w("PidAssignment", "Dropping invalid stored PID assignment (${raw.length} chars)") }
+            return null
+        }
+
         fun decode(raw: String): PidAssignment? {
             val parts = raw.split("|")
             if (parts.size < 4) return null
@@ -55,8 +70,9 @@ data class PidAssignment(
             val mode = parts[1].toIntOrNull(16) ?: return null
             val id = parts[2].toIntOrNull(16) ?: return null
             val decode = runCatching { PidDecode.valueOf(parts[3]) }.getOrNull() ?: return null
-            val header = parts.getOrNull(4)?.toIntOrNull(16)
-            return PidAssignment(signal, mode, id, decode, header)
+            val header = parts.getOrNull(4)?.let { it.toIntOrNull(16) ?: return rejected(raw) }
+            val result = PidAssignment(signal, mode, id, decode, header)
+            return if (result.isValid) result else rejected(raw)
         }
     }
 }
@@ -175,6 +191,12 @@ data class PidScanLogEntry(
     }
 
     companion object {
+        private fun rejected(raw: String): PidAssignment? {
+            // Stored values are user data; never throw, just drop (value not logged in full).
+            runCatching { Log.w("PidAssignment", "Dropping invalid stored PID assignment (${raw.length} chars)") }
+            return null
+        }
+
         fun decode(raw: String): PidScanLogEntry? {
             val parts = raw.split("|")
             if (parts.size < 5) return null

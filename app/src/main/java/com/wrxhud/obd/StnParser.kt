@@ -55,6 +55,107 @@ object StnParser {
         return bytes.copyOfRange(3, bytes.size)
     }
 
+    /** Result of [parseMultiPid]. */
+    class MultiPidResult(
+        /** PID -> data bytes (without the `41 <pid>` framing), first ECU wins. */
+        val values: Map<Int, ByteArray>,
+        /** Requested PIDs that did not come back complete. */
+        val missing: List<Int>,
+        /** Number of distinct Mode 01 (`41`) responses seen: > 1 means several ECUs answered. */
+        val responseCount: Int
+    )
+
+    /** Data length in bytes of Mode 01 PIDs we batch; null = unknown (never batched). */
+    fun pidDataLength(pid: Int): Int? = PID_DATA_LENGTH[pid]
+
+    private val PID_DATA_LENGTH: Map<Int, Int> = mapOf(
+        0x01 to 4, 0x04 to 1, 0x05 to 1, 0x06 to 1, 0x07 to 1, 0x08 to 1, 0x09 to 1,
+        0x0A to 1, 0x0B to 1, 0x0C to 2, 0x0D to 1, 0x0E to 1, 0x0F to 1, 0x10 to 2,
+        0x11 to 1, 0x2F to 1, 0x33 to 1,
+        0x34 to 4, 0x35 to 4, 0x36 to 4, 0x37 to 4, 0x38 to 4, 0x39 to 4, 0x3A to 4, 0x3B to 4,
+        0x42 to 2, 0x43 to 2, 0x44 to 2, 0x45 to 1, 0x46 to 1, 0x47 to 1, 0x48 to 1,
+        0x49 to 1, 0x4A to 1, 0x4B to 1, 0x4C to 1, 0x5C to 1
+    )
+
+    private val LEN_LINE = Regex("^[0-9A-F]{3}$")
+    private val INDEXED_LINE = Regex("^([0-9A-F]):([0-9A-F]+)$")
+    private val HEX_LINE = Regex("^[0-9A-F]+$")
+    private val NOISE = listOf(
+        "NODATA", "ERROR", "BUSINIT", "UNABLE", "STOPPED", "?", "BUFFERFULL", "CANERROR", "BUSBUSY"
+    )
+
+    private class Group(var declaredLen: Int?) {
+        val bytes = ArrayList<Int>()
+        var hasData = false
+    }
+
+    /**
+     * Parses a Mode 01 reply that may carry several PIDs (`41 0C xx xx 0D yy ...`), in
+     * ATH0 / ATS0 / ATAL form: single frame lines, or ISO-TP multi-frame as
+     * `0AB` + `0: ...` + `1: ...` lines. Tolerates `SEARCHING...`, extra ECU lines,
+     * NO DATA, padding and truncated frames (incomplete PIDs end up in `missing`).
+     */
+    fun parseMultiPid(raw: String, requested: List<Int>): MultiPidResult {
+        val groups = ArrayList<Group>()
+        var open: Group? = null
+        for (line0 in raw.split('\r', '\n')) {
+            val line = line0.replace(">", "").replace(" ", "").trim().uppercase()
+                .replace("SEARCHING...", "")
+            if (line.isEmpty()) continue
+            if (NOISE.any { line.contains(it) }) { open = null; continue }
+            val idx = INDEXED_LINE.matchEntire(line)
+            when {
+                idx != null -> {
+                    val n = idx.groupValues[1].toInt(16)
+                    val hex = idx.groupValues[2]
+                    if (hex.length % 2 != 0) { open = null; continue }
+                    var g = open
+                    if (g == null || (n == 0 && g.hasData)) {
+                        g = Group(null).also { groups += it }
+                        open = g
+                    }
+                    for (i in 0 until hex.length / 2) g.bytes += hex.substring(i * 2, i * 2 + 2).toInt(16)
+                    g.hasData = true
+                }
+                LEN_LINE.matches(line) -> {
+                    open = Group(line.toInt(16)).also { groups += it }
+                }
+                HEX_LINE.matches(line) && line.length % 2 == 0 -> {
+                    val g = Group(null).also { groups += it }
+                    for (i in 0 until line.length / 2) g.bytes += line.substring(i * 2, i * 2 + 2).toInt(16)
+                    g.hasData = true
+                    open = null
+                }
+                else -> open = null
+            }
+        }
+
+        val values = LinkedHashMap<Int, ByteArray>()
+        var responses = 0
+        for (g in groups) {
+            val declared = g.declaredLen
+            val bytes = if (declared != null && g.bytes.size > declared) g.bytes.subList(0, declared) else g.bytes
+            if (bytes.isEmpty() || bytes[0] != 0x41) continue
+            responses++
+            var pos = 1
+            while (pos < bytes.size) {
+                val pid = bytes[pos]
+                val known = PID_DATA_LENGTH[pid]
+                val len = when {
+                    known != null -> known
+                    requested.size == 1 && pid == requested[0] -> bytes.size - pos - 1
+                    else -> break
+                }
+                if (len <= 0 || pos + 1 + len > bytes.size) break
+                if (pid in requested && pid !in values) {
+                    values[pid] = ByteArray(len) { bytes[pos + 1 + it].toByte() }
+                }
+                pos += 1 + len
+            }
+        }
+        return MultiPidResult(values, requested.filter { it !in values }, responses)
+    }
+
     fun decodeRpm(data: ByteArray): Float? {
         if (data.size < 2) return null
         val a = data[0].toInt() and 0xFF
